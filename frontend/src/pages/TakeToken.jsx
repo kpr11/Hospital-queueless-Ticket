@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { apiTakeToken } from '../services/api.js';
 import { useAppConfig } from '../hooks/useAppConfig.js';
 import { useQueueState } from '../hooks/useQueueState.js';
@@ -73,6 +73,14 @@ export default function TakeToken() {
       {announcement?.message && (
         <div className="mb-8 p-4 border border-warn bg-warn/10 text-warn text-sm font-medium">
           {announcement.message}
+        </div>
+      )}
+
+      {cfg.industry === 'medical' && (
+        <div className="mb-8 p-4 border border-accent bg-accent/5 text-accent-deep text-sm">
+          Here for a hospital visit?{' '}
+          <Link to="/register" className="underline font-medium">Register your details first →</Link>{' '}
+          Your token is issued at the department desk after an Aadhaar check.
         </div>
       )}
 

@@ -20,6 +20,10 @@ const envSchema = Joi.object({
   AVG_SERVICE_TIME_SECONDS: Joi.number().integer().positive().default(180),
   TOKEN_EXPIRY_SECONDS: Joi.number().integer().positive().default(3600),
 
+  // Hospital patient registrations that never check in at a department desk are
+  // marked "expired" after this many hours.
+  PATIENT_REGISTRATION_TTL_HOURS: Joi.number().integer().positive().default(12),
+
   ANALYTICS_SINK: Joi.string().valid('csv', 'mongo').default('csv'),
   ANALYTICS_CSV_PATH: Joi.string().default('../analytics/data/queue_events.csv'),
   ANALYTICS_MODEL_PATH: Joi.string().default('../analytics/models/predictions.json'),
@@ -46,6 +50,11 @@ const envSchema = Joi.object({
   AI_API_KEY: Joi.string().allow('').optional(),
   AI_MODEL: Joi.string().allow('').optional(),
   AI_BASE_URL: Joi.string().allow('').optional(),
+
+  // Keying material for hashing Aadhaar numbers (HMAC-SHA256). Optional — falls
+  // back to JWT_SECRET. Set a dedicated value so rotating the JWT secret does
+  // not orphan every stored patient record.
+  AADHAAR_SALT: Joi.string().allow('').optional(),
 }).unknown(true);
 
 const { value: env, error } = envSchema.validate(process.env, { abortEarly: false });
@@ -87,6 +96,10 @@ module.exports = {
     tokenExpirySeconds: env.TOKEN_EXPIRY_SECONDS,
   },
 
+  patient: {
+    registrationTtlHours: env.PATIENT_REGISTRATION_TTL_HOURS,
+  },
+
   analytics: {
     sink: env.ANALYTICS_SINK,
     csvPath: env.ANALYTICS_CSV_PATH,
@@ -108,6 +121,8 @@ module.exports = {
   },
 
   frontendUrl: env.FRONTEND_URL,
+
+  aadhaarSalt: env.AADHAAR_SALT || null,
 
   ai: {
     provider: env.AI_PROVIDER,

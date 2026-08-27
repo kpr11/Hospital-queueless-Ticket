@@ -40,6 +40,7 @@
           "referredAt":      { ".validate": "newData.isNumber() || newData.val() == null" },
           "referralReason":  { ".validate": "newData.isString() && newData.val().length <= 300 || newData.val() == null" },
           "referralHistory": { ".validate": true },
+          "patientId":       { ".validate": "newData.isString() || newData.val() == null" },
           "$other":    { ".validate": false }
         }
       },
@@ -51,6 +52,13 @@
     },
 
     "admins": {
+      ".read": false,
+      ".write": false
+    },
+
+    "hospital": {
+      /* Patient registry — demographics + Aadhaar hash (PII). Backend-only via
+         the Admin SDK; served exclusively through the authorized REST API. */
       ".read": false,
       ".write": false
     },

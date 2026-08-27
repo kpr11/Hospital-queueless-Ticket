@@ -62,6 +62,16 @@ async function onTokenReferred(p) {
   });
 }
 
+async function onPatientRegistered(p) {
+  await createNotification({
+    recipients: await adminUsernames(),
+    type: 'queue',
+    title: 'Patient registered',
+    body: `${p.name} → ${p.department}${p.source === 'self' ? ' (self-service)' : ''}`,
+    link: '/admin/reception',
+  });
+}
+
 async function onQueueCreated(p) {
   await createNotification({
     recipients: await adminUsernames(),
@@ -96,5 +106,5 @@ async function onMessageSent(p) {
 
 module.exports = {
   createNotification, listFor, markRead, markAllRead,
-  onTokenReferred, onQueueCreated, onQueueArchived, onMessageSent,
+  onTokenReferred, onPatientRegistered, onQueueCreated, onQueueArchived, onMessageSent,
 };

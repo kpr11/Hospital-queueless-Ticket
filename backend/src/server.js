@@ -6,6 +6,7 @@ const analyticsService = require('./services/analytics.service');
 const expiryService = require('./services/expiry.service');
 const schedulerService = require('./services/scheduler.service');
 const appointmentMergeService = require('./services/appointmentMerge.service');
+const patientCleanupService = require('./services/patientCleanup.service');
 const { registerSubscribers } = require('./events');
 
 async function main() {
@@ -17,6 +18,7 @@ async function main() {
   expiryService.startExpirySweep();
   schedulerService.startScheduler();
   appointmentMergeService.startAppointmentMerge();
+  patientCleanupService.startPatientCleanup();
   console.log('[boot] Firebase state initialized.');
 
   const app = buildApp();
@@ -32,6 +34,7 @@ async function main() {
       expiryService.stopExpirySweep();
       schedulerService.stopScheduler();
       appointmentMergeService.stopAppointmentMerge();
+      patientCleanupService.stopPatientCleanup();
       try {
         await analyticsService.close();
       } catch (e) {

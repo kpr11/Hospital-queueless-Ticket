@@ -3,25 +3,28 @@ import { Link } from 'react-router-dom';
 import QRCode from 'qrcode';
 import { useQueueState } from '../hooks/useQueueState.js';
 import { useTheme } from '../context/ThemeContext.jsx';
+import { useAppConfig } from '../hooks/useAppConfig.js';
 import StatusBadge from '../components/StatusBadge.jsx';
 
 export default function Home() {
   const { state, tokens, announcement, loading } = useQueueState();
   const { dark } = useTheme();
+  const cfg = useAppConfig();
+  const isMedical = cfg.industry === 'medical';
   const tokenList = Object.values(tokens || {});
   const waiting = tokenList.filter(t => t.status === 'waiting').length;
   const nowServing = state?.currentTokenNumber || 0;
   const [qrDataUrl, setQrDataUrl] = useState(null);
 
   useEffect(() => {
-    const takeUrl = `${window.location.origin}/take`;
+    const joinUrl = `${window.location.origin}${isMedical ? '/register' : '/take'}`;
     // QR foreground adapts to current theme
     const qrDark = dark ? '#F0EBE3' : '#171615';
     const qrLight = dark ? '#1C1A18' : '#FBF7F0';
-    QRCode.toDataURL(takeUrl, { width: 160, margin: 1, color: { dark: qrDark, light: qrLight } })
+    QRCode.toDataURL(joinUrl, { width: 160, margin: 1, color: { dark: qrDark, light: qrLight } })
       .then(setQrDataUrl)
       .catch(() => {});
-  }, [dark]);
+  }, [dark, isMedical]);
 
   return (
     <div className="max-w-6xl mx-auto px-6 py-10 lg:py-16">
@@ -50,7 +53,9 @@ export default function Home() {
           </p>
 
           <div className="mt-8 flex flex-col sm:flex-row gap-4">
-            <Link to="/take" className="btn-primary">Take a token →</Link>
+            {isMedical
+              ? <Link to="/register" className="btn-primary">Register your visit →</Link>
+              : <Link to="/take" className="btn-primary">Take a token →</Link>}
             <Link to="/book" className="btn-secondary">Book an appointment</Link>
             <Link to="/lookup" className="btn-secondary">I already have a token</Link>
           </div>
@@ -101,9 +106,9 @@ export default function Home() {
           {/* Scan-to-join QR */}
           {qrDataUrl && (
             <div className="mt-6 w-full max-w-sm border border-rule bg-cream p-4 flex items-center gap-4">
-              <img src={qrDataUrl} alt="Scan to take a token" className="w-16 h-16 shrink-0" />
+              <img src={qrDataUrl} alt={isMedical ? 'Scan to register your visit' : 'Scan to take a token'} className="w-16 h-16 shrink-0" />
               <div>
-                <div className="label">Scan to join queue</div>
+                <div className="label">{isMedical ? 'Scan to register your visit' : 'Scan to join queue'}</div>
                 <p className="text-xs text-graphite mt-1">Point your phone camera here — no app needed.</p>
               </div>
             </div>

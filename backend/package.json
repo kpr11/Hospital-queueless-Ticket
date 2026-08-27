@@ -12,7 +12,7 @@
     "dev": "nodemon src/server.js",
     "test": "jest --runInBand --detectOpenHandles",
     "test:watch": "jest --watch",
-    "lint": "echo 'Add ESLint in v2'"
+    "lint": "eslint src"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
@@ -29,6 +29,9 @@
     "nodemailer": "^9.0.5"
   },
   "devDependencies": {
+    "@eslint/js": "^9.39.5",
+    "eslint": "^9.39.5",
+    "globals": "^17.11.0",
     "jest": "^29.7.0",
     "nodemon": "^3.1.4",
     "supertest": "^7.0.0"

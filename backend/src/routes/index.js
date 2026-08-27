@@ -5,6 +5,7 @@ const { refs } = require('../config/firebase');
 
 router.use('/auth',     require('./auth.routes'));
 router.use('/tokens',   require('./token.routes'));
+router.use('/patients', require('./patient.routes'));
 router.use('/admin',    require('./admin.routes'));
 router.use('/staff',    require('./staff.routes'));
 router.use('/assistant', require('./assistant.routes'));

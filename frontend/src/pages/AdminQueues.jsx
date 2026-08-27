@@ -1,7 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Navigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
-import { apiQueuesOverview, apiSetQueueEnabled, apiReorderQueues } from '../services/api.js';
+import { apiQueuesOverview, apiSetQueueEnabled, apiReorderQueues, apiSeedQueueDefaults } from '../services/api.js';
+import { useAppConfig } from '../hooks/useAppConfig.js';
+import { getIndustryName } from '../utils/industry.js';
 
 function fmtWait(seconds) {
   if (!seconds || seconds <= 0) return '—';
@@ -65,10 +67,12 @@ function QueueCard({ q, index, total, onToggle, onMove, busyId }) {
 
 export default function AdminQueues() {
   const { user } = useAuth();
+  const cfg = useAppConfig();
   const [queues, setQueues] = useState([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState(null);
   const [busyId, setBusyId] = useState(null);
+  const [seedMsg, setSeedMsg] = useState(null);
 
   const load = useCallback(async () => {
     try { setQueues(await apiQueuesOverview()); setLoading(false); }
@@ -116,10 +120,21 @@ export default function AdminQueues() {
         </div>
         <div className="flex items-center gap-3">
           <Link to="/admin" className="btn-secondary text-sm">← Dashboard</Link>
+          <button
+            onClick={() => run(async () => {
+              const r = await apiSeedQueueDefaults(cfg.industry);
+              setSeedMsg(r.message);
+            })}
+            className="btn-secondary text-sm"
+            title={`Add any missing ${getIndustryName(cfg.industry)} departments`}
+          >
+            + {getIndustryName(cfg.industry)} defaults
+          </button>
           <Link to="/admin/queues/new" className="btn-primary text-sm">+ New queue</Link>
         </div>
       </div>
 
+      {seedMsg && <div className="mb-6 p-3 border border-success/40 bg-success/5 text-success text-sm">{seedMsg}</div>}
       {err && <div className="mb-6 p-3 border border-accent bg-accent/5 text-accent-deep text-sm">{err}</div>}
 
       {loading ? (

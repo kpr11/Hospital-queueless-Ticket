@@ -131,6 +131,20 @@ export default function Display() {
                   </div>
                 )}
 
+                {waiting.length > 0 && (
+                  <div className="mt-3 pt-3 border-t border-paper/10 text-sm text-paper/50">
+                    <span className="text-[10px] tracking-[0.15em] uppercase text-paper/40 mr-2">Waiting</span>
+                    <span className="font-mono">
+                      {waiting
+                        .slice()
+                        .sort((a, b) => a.number - b.number)
+                        .slice(0, 6)
+                        .map(t => String(t.number).padStart(2, '0'))
+                        .join('  ')}
+                    </span>
+                  </div>
+                )}
+
                 <div className="mt-4 flex items-center justify-between text-xs">
                   <span className={called ? 'text-accent font-medium' : 'text-paper/30'}>
                     {called ? 'Now serving' : 'No one called'}

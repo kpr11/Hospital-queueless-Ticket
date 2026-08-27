@@ -13,6 +13,7 @@ function registerSubscribers() {
   registered = true;
 
   on(EVENTS.TOKEN_REFERRED, notifications.onTokenReferred);
+  on(EVENTS.PATIENT_REGISTERED, notifications.onPatientRegistered);
   on(EVENTS.QUEUE_CREATED, notifications.onQueueCreated);
   on(EVENTS.QUEUE_ARCHIVED, notifications.onQueueArchived);
   on(EVENTS.MESSAGE_SENT, notifications.onMessageSent);

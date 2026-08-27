@@ -140,7 +140,27 @@ async function updateAppConfig(req, res) {
   Object.keys(updates).forEach(k => updates[k] === undefined && delete updates[k]);
 
   await refs.appConfig().update(updates);
-  res.json({ message: 'Config updated.', ...updates });
+
+  // When an industry is (re)selected, make sure its default counters exist as
+  // real queues so staff assignment / analytics / capacity work out of the box.
+  // Idempotent and never re-adds a queue the admin deleted.
+  let seeded;
+  if (industry) {
+    try {
+      seeded = await queueAdminService.seedIndustryDefaults(industry);
+    } catch (e) {
+      console.error('[config] industry seed failed (non-fatal):', e.message);
+    }
+  }
+
+  res.json({ message: 'Config updated.', ...updates, ...(seeded ? { seededQueues: seeded.seeded } : {}) });
+}
+
+async function seedQueueDefaults(req, res) {
+  const snap = await refs.appConfig().once('value');
+  const industry = (req.body && req.body.industry) || snap.val()?.industry || 'general';
+  const result = await queueAdminService.seedIndustryDefaults(industry);
+  res.json({ message: `Seeded ${result.seeded} default queue(s) for "${industry}".`, ...result });
 }
 
 async function getFeedback(req, res) {
@@ -431,5 +451,5 @@ module.exports = {
   listAdmins, createAdmin, deleteAdmin, setAdminRole,
   queueStaff, queueAnalytics,
   listQueues, queuesOverview, getQueue, createQueue, updateQueue,
-  setQueueEnabled, archiveQueue, deleteQueue, reorderQueues,
+  setQueueEnabled, archiveQueue, deleteQueue, reorderQueues, seedQueueDefaults,
 };

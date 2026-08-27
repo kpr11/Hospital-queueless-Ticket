@@ -13,6 +13,7 @@ const crypto = require('crypto');
 const { refs } = require('../config/firebase');
 const queueService = require('./queue.service');
 const { emit, EVENTS } = require('../events/bus');
+const { INDUSTRY_PROFILES } = require('../config/industryProfiles');
 
 const KEY_RE = /^[a-z0-9_]{1,40}$/;
 const PREFIX_RE = /^[A-Z0-9]{1,4}$/;
@@ -162,6 +163,44 @@ async function deleteQueue(id) {
   return { id, deleted: true };
 }
 
+/**
+ * Create real `queues` records from an industry profile for any department that
+ * doesn't exist yet (matched by key). Never touches or re-adds an archived
+ * queue the admin deleted on purpose. Idempotent.
+ */
+async function seedIndustryDefaults(industry) {
+  const profile = INDUSTRY_PROFILES[industry];
+  if (!profile) return { seeded: 0, industry };
+
+  const existing = await listQueues();
+  const knownKeys = new Set(existing.map(q => q.key));
+  const missing = profile.services.filter(s => !knownKeys.has(s.id));
+  if (missing.length === 0) return { seeded: 0, industry };
+
+  const now = Date.now();
+  let order = existing.length;
+  await Promise.all(missing.map((s) => {
+    const record = {
+      id: crypto.randomUUID(),
+      key: s.id,
+      label: s.title,
+      prefix: (s.prefix || s.title.slice(0, 2)).toUpperCase(),
+      enabled: true,
+      archived: false,
+      capacity: null,
+      avgServiceSeconds: null,
+      workingHours: null,
+      order: order++,
+      createdAt: now,
+      updatedAt: now,
+      seeded: true,
+    };
+    return refs.queueDef(record.id).set(record);
+  }));
+
+  return { seeded: missing.length, industry };
+}
+
 async function reorderQueues(orderedIds = []) {
   if (!Array.isArray(orderedIds) || orderedIds.length === 0) {
     throw badRequest('orderedIds must be a non-empty array of queue ids.');
@@ -217,4 +256,5 @@ module.exports = {
   archiveQueue,
   deleteQueue,
   reorderQueues,
+  seedIndustryDefaults,
 };

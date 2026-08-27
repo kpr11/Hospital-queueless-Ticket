@@ -83,3 +83,4 @@ tmp/
 
 # Firebase Admin SDK secrets
 *firebase-adminsdk*.json
+backend/serviceAccount.json

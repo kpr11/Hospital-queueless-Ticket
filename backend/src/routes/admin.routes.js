@@ -53,6 +53,7 @@ router.get('/queues/:id',               asyncHandler(controller.getQueue));
 router.get('/queues/:id/staff',         asyncHandler(controller.queueStaff));
 router.get('/queues/:id/analytics',     asyncHandler(controller.queueAnalytics));
 router.post('/queues',                  asyncHandler(controller.createQueue));
+router.post('/queues/seed-defaults',    asyncHandler(controller.seedQueueDefaults));
 router.put('/queues/reorder',           asyncHandler(controller.reorderQueues));
 router.put('/queues/:id',               asyncHandler(controller.updateQueue));
 router.put('/queues/:id/enabled',       asyncHandler(controller.setQueueEnabled));

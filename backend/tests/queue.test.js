@@ -110,6 +110,8 @@ jest.mock('../src/config/firebase', () => {
       uploadIndexEntry: (o, id) => makeRef(`uploadIndex/${o}/${id}`),
       feedback: () => makeRef('feedback'),
       feedbackEntry: (t) => makeRef(`feedback/${t}`),
+      patients: () => makeRef('hospital/patients'),
+      patient: (id) => makeRef(`hospital/patients/${id}`),
     },
     __resetStore: () => Object.keys(store).forEach(k => delete store[k]),
   };
@@ -852,5 +854,197 @@ describe('Notification center', () => {
   test('requires authentication', async () => {
     const res = await request(app).get('/api/v1/notifications');
     expect(res.status).toBe(401);
+  });
+});
+
+describe('Aadhaar validation (utils/aadhaar)', () => {
+  const { isValidAadhaar, last4, normaliseAadhaar } = require('../src/utils/aadhaar');
+
+  test('accepts a 12-digit number with a valid Verhoeff checksum', () => {
+    expect(isValidAadhaar('234567890124')).toBe(true);
+    expect(isValidAadhaar('2345 6789 0124')).toBe(true); // spaces stripped
+  });
+
+  test('rejects a bad checksum, wrong length, and a leading 0/1', () => {
+    expect(isValidAadhaar('234567890123')).toBe(false); // checksum
+    expect(isValidAadhaar('12345')).toBe(false);
+    expect(isValidAadhaar('123456789012')).toBe(false); // leading 1
+  });
+
+  test('last4 / normalise helpers', () => {
+    expect(normaliseAadhaar('2345-6789-0124')).toBe('234567890124');
+    expect(last4('2345 6789 0124')).toBe('0124');
+  });
+});
+
+describe('Patient registration & Aadhaar-verified token issuance', () => {
+  let adminToken;
+  const VALID_AADHAAR = '234567890124';
+  const OTHER_AADHAAR = '789456123014';
+
+  const patientBody = (over = {}) => ({
+    name: 'Asha Rao',
+    age: 41,
+    gender: 'female',
+    mobile: '9876500011',
+    address: '5 Residency Road, Bengaluru',
+    aadhaar: VALID_AADHAAR,
+    department: 'opd',
+    consent: true,
+    ...over,
+  });
+
+  beforeAll(async () => {
+    const res = await request(app).post('/api/v1/auth/login').send({ username: 'admin', password: 'testpassword123' });
+    adminToken = res.body.token;
+  });
+
+  test('public self-registration succeeds and never leaks the raw Aadhaar or its hash', async () => {
+    const res = await request(app).post('/api/v1/patients/register').send(patientBody());
+    expect(res.status).toBe(201);
+    expect(res.body.patient.aadhaarLast4).toBe('0124');
+    expect(res.body.patient.aadhaarHash).toBeUndefined();
+    expect(res.body.patient.aadhaar).toBeUndefined();
+    expect(res.body.patient.status).toBe('registered');
+  });
+
+  test('rejects an Aadhaar number with a bad checksum', async () => {
+    const res = await request(app).post('/api/v1/patients/register').send(patientBody({ aadhaar: '234567890123' }));
+    expect(res.status).toBe(400);
+  });
+
+  test('rejects a duplicate pending registration for the same department', async () => {
+    const res = await request(app).post('/api/v1/patients/register')
+      .send(patientBody({ aadhaar: OTHER_AADHAAR, name: 'Ravi Kumar', mobile: '9876500022' }));
+    expect(res.status).toBe(201);
+    const dupe = await request(app).post('/api/v1/patients/register')
+      .send(patientBody({ aadhaar: OTHER_AADHAAR, name: 'Ravi Kumar', mobile: '9876500022' }));
+    expect(dupe.status).toBe(409);
+  });
+
+  test('department desk verifies the Aadhaar and issues a token', async () => {
+    // fresh registration for a clean department
+    await request(app).post('/api/v1/patients/register')
+      .send(patientBody({ department: 'dental', aadhaar: VALID_AADHAAR, name: 'Meena S', mobile: '9876500033' }));
+
+    const issue = await request(app).post('/api/v1/patients/verify-issue')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ aadhaar: VALID_AADHAAR, department: 'dental' });
+    expect(issue.status).toBe(201);
+    expect(issue.body.token.service).toBe('dental');
+    expect(issue.body.token.patientName).toBe('Meena S');
+    expect(issue.body.token.patientId).toBe(issue.body.patient.id);
+
+    const pid = issue.body.patient.id;
+    const fetched = await request(app).get(`/api/v1/patients/${pid}`).set('Authorization', `Bearer ${adminToken}`);
+    expect(fetched.body.patient.status).toBe('tokenIssued');
+    expect(fetched.body.patient.tokenNumber).toBe(issue.body.token.number);
+  });
+
+  test('a wrong Aadhaar number finds no pending registration (404)', async () => {
+    const res = await request(app).post('/api/v1/patients/verify-issue')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ aadhaar: '555444333229', department: 'opd' });
+    expect(res.status).toBe(404);
+  });
+
+  test('a second verify for the same patient is rejected (409)', async () => {
+    const res = await request(app).post('/api/v1/patients/verify-issue')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ aadhaar: VALID_AADHAAR, department: 'dental' });
+    expect(res.status).toBe(409);
+  });
+
+  test('verify-issue requires authentication', async () => {
+    const res = await request(app).post('/api/v1/patients/verify-issue')
+      .send({ aadhaar: VALID_AADHAAR, department: 'opd' });
+    expect(res.status).toBe(401);
+  });
+
+  test('registration requires explicit consent', async () => {
+    const { consent, ...noConsent } = patientBody({ aadhaar: '555444333229', mobile: '9870000001', department: 'ent' });
+    const res = await request(app).post('/api/v1/patients/register').send(noConsent);
+    expect(res.status).toBe(400);
+  });
+
+  test('the honeypot field rejects bot submissions', async () => {
+    const res = await request(app).post('/api/v1/patients/register')
+      .send(patientBody({ aadhaar: '555444333229', mobile: '9870000002', department: 'ent', website: 'http://spam.example' }));
+    expect(res.status).toBe(400);
+  });
+
+  test('rejects a duplicate pending registration by mobile number', async () => {
+    await request(app).post('/api/v1/patients/register')
+      .send(patientBody({ aadhaar: '789456123014', mobile: '9870000009', department: 'lab', name: 'Mobile Dupe' }));
+    const dupe = await request(app).post('/api/v1/patients/register')
+      .send(patientBody({ aadhaar: '555444333229', mobile: '9870000009', department: 'lab', name: 'Mobile Dupe' }));
+    expect(dupe.status).toBe(409);
+  });
+
+  test('admin can list, edit and cancel a registration', async () => {
+    const reg = await request(app).post('/api/v1/patients/register')
+      .send(patientBody({ aadhaar: '789456123014', mobile: '9870000010', department: 'pharmacy', name: 'Edit Me' }));
+    const id = reg.body.patient.id;
+
+    const list = await request(app).get('/api/v1/patients/registrations?status=registered')
+      .set('Authorization', `Bearer ${adminToken}`);
+    expect(list.status).toBe(200);
+    expect(list.body.patients.some(p => p.id === id)).toBe(true);
+
+    const edit = await request(app).put(`/api/v1/patients/${id}`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ name: 'Edited Name', address: '9 New Street' });
+    expect(edit.status).toBe(200);
+    expect(edit.body.patient.name).toBe('Edited Name');
+
+    const cancel = await request(app).post(`/api/v1/patients/${id}/cancel`)
+      .set('Authorization', `Bearer ${adminToken}`);
+    expect(cancel.status).toBe(200);
+    expect(cancel.body.patient.status).toBe('cancelled');
+
+    // editing a cancelled registration is refused
+    const editAgain = await request(app).put(`/api/v1/patients/${id}`)
+      .set('Authorization', `Bearer ${adminToken}`).send({ name: 'Nope' });
+    expect(editAgain.status).toBe(409);
+  });
+
+  test('the stale-registration sweeper expires pending records', async () => {
+    const patientService = require('../src/services/patient.service');
+    await request(app).post('/api/v1/patients/register')
+      .send(patientBody({ aadhaar: '555444333229', mobile: '9870000020', department: 'radiology', name: 'Stale One' }));
+    // negative TTL => cutoff is in the future => every pending record is stale
+    const { expired } = await patientService.expireStaleRegistrations(-1);
+    expect(expired).toBeGreaterThanOrEqual(1);
+  });
+
+  test('POST /admin/queues/seed-defaults creates the industry default queues', async () => {
+    const res = await request(app).post('/api/v1/admin/queues/seed-defaults')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ industry: 'medical' });
+    expect(res.status).toBe(200);
+    expect(res.body.seeded).toBeGreaterThan(0);
+
+    const again = await request(app).post('/api/v1/admin/queues/seed-defaults')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ industry: 'medical' });
+    expect(again.body.seeded).toBe(0); // idempotent
+  });
+
+  test('a staff member can only issue for their own assigned counter', async () => {
+    await request(app).post('/api/v1/admin/staff').set('Authorization', `Bearer ${adminToken}`)
+      .send({ username: 'opdstaff', password: 'staffpass123', service: 'opd', displayName: 'OPD Desk' });
+    const login = await request(app).post('/api/v1/staff/login').send({ username: 'opdstaff', password: 'staffpass123' });
+    const staffToken = login.body.token;
+
+    await request(app).post('/api/v1/patients/register')
+      .send(patientBody({ department: 'opd', aadhaar: '555444333229', name: 'Sundar P', mobile: '9876500044' }));
+
+    // staff asks for cardiology but is forced back to their own service (opd) ->
+    // the opd registration is found and issued, not cardiology.
+    const res = await request(app).post('/api/v1/patients/verify-issue')
+      .set('Authorization', `Bearer ${staffToken}`)
+      .send({ aadhaar: '555444333229', department: 'cardiology' });
+    expect(res.status).toBe(201);
+    expect(res.body.token.service).toBe('opd');
   });
 });

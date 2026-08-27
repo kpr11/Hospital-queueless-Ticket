@@ -31,6 +31,22 @@ export default function Layout({ children }) {
   // Auto-logout with a "session expired" notice when the JWT lapses.
   useSessionExpiry();
 
+  // Close the admin dropdown on outside-click / Escape. Declared before any
+  // early return so hook order stays stable across route changes.
+  useEffect(() => {
+    const handler = (e) => {
+      if (dropRef.current && !dropRef.current.contains(e.target)) setAdminDropOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  useEffect(() => {
+    const handler = (e) => { if (e.key === 'Escape') setAdminDropOpen(false); };
+    document.addEventListener('keydown', handler);
+    return () => document.removeEventListener('keydown', handler);
+  }, []);
+
   if (onDisplay) return <ErrorBoundary key={loc.pathname}>{children}</ErrorBoundary>;
 
   const logoTarget = user ? '/admin' : staff ? '/staff' : '/';
@@ -55,31 +71,12 @@ export default function Layout({ children }) {
     setTimeout(() => setSignedOutMsg(false), 3000);
   };
 
-  // Close dropdown when clicking outside
-  useEffect(() => {
-    const handler = (e) => {
-      if (dropRef.current && !dropRef.current.contains(e.target)) {
-        setAdminDropOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, []);
-
-  // Close dropdown on Escape
-  useEffect(() => {
-    const handler = (e) => {
-      if (e.key === 'Escape') setAdminDropOpen(false);
-    };
-    document.addEventListener('keydown', handler);
-    return () => document.removeEventListener('keydown', handler);
-  }, []);
-
   const adminNavLinks = [
     { to: '/admin', label: 'Dashboard' },
     { to: '/admin/queues', label: 'Queues' },
     { to: '/admin/analytics', label: 'Analytics' },
     { to: '/admin/staff', label: 'Staff' },
+    { to: '/admin/reception', label: 'Reception' },
     { to: '/files', label: 'Files' },
     { to: '/admin/manage', label: 'Admins' },
     { to: '/admin/audit', label: 'Activity' },

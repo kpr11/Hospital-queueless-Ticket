@@ -1,11 +1,11 @@
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Navigate, Link } from 'react-router-dom';
 import { useStaff } from '../context/StaffContext.jsx';
 import { useQueueState } from '../hooks/useQueueState.js';
 import { usePresence } from '../hooks/usePresence.js';
 import { useAppConfig } from '../hooks/useAppConfig.js';
 import { getServiceLabel, getServices } from '../utils/industry.js';
-import { apiStaffCallNext, apiSkipToken, apiSetStaffTokenNote, apiStaffReferToken } from '../services/api.js';
+import { apiStaffCallNext, apiSkipToken, apiSetStaffTokenNote, apiStaffReferToken, apiPendingRegistrations, apiVerifyAndIssueToken } from '../services/api.js';
 import StatusBadge from '../components/StatusBadge.jsx';
 import LiveTimer from '../components/LiveTimer.jsx';
 
@@ -24,7 +24,31 @@ export default function StaffDashboard() {
   const [referReason, setReferReason] = useState('');
   const [referBusy, setReferBusy] = useState(false);
 
+  // Patient check-in (Aadhaar verify → issue token) — hospital industry only.
+  const [showCheckin, setShowCheckin] = useState(false);
+  const [pendingPatients, setPendingPatients] = useState([]);
+  const [checkinAadhaar, setCheckinAadhaar] = useState('');
+  const [checkinBusy, setCheckinBusy] = useState(false);
+  const [checkinError, setCheckinError] = useState(null);
+  const [checkinIssued, setCheckinIssued] = useState(null);
+
   usePresence(staff?.username, staff?.service);
+
+  const isMedical = cfg.industry === 'medical';
+
+  const loadPending = useCallback(() => {
+    if (!staff?.service) return;
+    apiPendingRegistrations(staff.service)
+      .then((r) => setPendingPatients(r.patients || []))
+      .catch(() => {});
+  }, [staff?.service]);
+
+  useEffect(() => {
+    if (!isMedical || !showCheckin) return;
+    loadPending();
+    const id = setInterval(loadPending, 8000);
+    return () => clearInterval(id);
+  }, [isMedical, showCheckin, loadPending]);
 
   if (!staff) return <Navigate to="/staff/login" replace />;
 
@@ -100,6 +124,23 @@ export default function StaffDashboard() {
       setErr(e.response?.data?.error || 'Could not refer this patient.');
     } finally {
       setReferBusy(false);
+    }
+  };
+
+  const handleCheckinIssue = async () => {
+    const digits = checkinAadhaar.replace(/\D/g, '');
+    if (digits.length !== 12) return;
+    setCheckinBusy(true);
+    setCheckinError(null);
+    try {
+      const res = await apiVerifyAndIssueToken({ aadhaar: digits, department: myService });
+      setCheckinIssued(res);
+      setCheckinAadhaar('');
+      loadPending();
+    } catch (e) {
+      setCheckinError(e.response?.data?.error || 'Could not issue a token.');
+    } finally {
+      setCheckinBusy(false);
     }
   };
 
@@ -284,6 +325,69 @@ export default function StaffDashboard() {
           </div>
         )}
       </div>
+
+      {/* Patient check-in — verify Aadhaar, issue token (hospital only) */}
+      {isMedical && (
+        <div className="mb-4 border border-rule bg-cream">
+          <button
+            onClick={() => { setShowCheckin(v => !v); setCheckinIssued(null); setCheckinError(null); }}
+            className="w-full flex items-center justify-between px-4 py-3 text-sm font-medium"
+          >
+            <span className="label">Register / check-in patient</span>
+            <span className="text-graphite">{showCheckin ? '−' : '+'}{pendingPatients.length > 0 && ` ${pendingPatients.length} waiting`}</span>
+          </button>
+
+          {showCheckin && (
+            <div className="px-4 pb-4 space-y-3">
+              {checkinIssued && (
+                <div className="border border-accent bg-accent/5 p-3 flex items-center gap-4">
+                  <span className="font-display text-4xl text-accent num">
+                    {String(checkinIssued.token.number).padStart(2, '0')}
+                  </span>
+                  <span className="text-xs text-graphite">
+                    <span className="block text-ink font-medium">{checkinIssued.patient.name}</span>
+                    Token issued for {serviceLabel}
+                  </span>
+                </div>
+              )}
+
+              {pendingPatients.length === 0 ? (
+                <p className="text-xs text-graphite py-2">No patients registered for {serviceLabel} yet.</p>
+              ) : (
+                <div className="border border-rule divide-y divide-rule">
+                  {pendingPatients.map(p => (
+                    <div key={p.id} className="px-3 py-2 flex items-center justify-between text-xs">
+                      <span>
+                        <span className="font-medium text-ink">{p.name}</span>
+                        <span className="text-graphite"> · {p.age}/{p.gender[0].toUpperCase()} · {p.mobile}</span>
+                      </span>
+                      <span className="font-mono text-graphite">XXXX {p.aadhaarLast4}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <div className="flex gap-2">
+                <input
+                  inputMode="numeric"
+                  value={checkinAadhaar.replace(/\D/g, '').slice(0, 12).replace(/(\d{4})(?=\d)/g, '$1 ').trim()}
+                  onChange={e => setCheckinAadhaar(e.target.value)}
+                  placeholder="Enter patient's Aadhaar #### #### ####"
+                  className="flex-1 border border-rule bg-paper px-3 py-2 text-sm font-mono tracking-wider focus:outline-none focus:border-ink"
+                />
+                <button
+                  onClick={handleCheckinIssue}
+                  disabled={checkinBusy || checkinAadhaar.replace(/\D/g, '').length !== 12}
+                  className="btn-primary text-xs px-3 disabled:opacity-40"
+                >
+                  {checkinBusy ? '…' : 'Verify & issue'}
+                </button>
+              </div>
+              {checkinError && <p className="text-xs text-accent-deep">{checkinError}</p>}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Next in queue */}
       {waiting.length > 0 && (
