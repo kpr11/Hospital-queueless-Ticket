@@ -118,4 +118,3 @@ jobs:
           printf '%s' '${{ secrets.FIREBASE_SERVICE_ACCOUNT }}' > "$RUNNER_TEMP/sa.json"
           export GOOGLE_APPLICATION_CREDENTIALS="$RUNNER_TEMP/sa.json"
           npx --yes firebase-tools@latest deploy --only hosting --project hospital-queueless-dev --non-interactive
-        working-directory: firebase

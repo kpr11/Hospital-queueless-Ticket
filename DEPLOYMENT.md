@@ -18,6 +18,10 @@ Replace `<PROJECT_ID>` below with your Firebase project id, and
 
 Once deployed, everything runs 24/7 — your laptop is only needed to push code.
 
+**Status:** frontend live at `https://hospital-queueless-dev.web.app` ·
+Firebase rules locked · backend **not yet deployed** (do the Render step below,
+then rebuild the frontend with `VITE_API_BASE_URL` set to the Render URL).
+
 ---
 
 ## 🔴 Blockers — before any public deploy
@@ -84,15 +88,19 @@ hospital-issued patient ID (MRN). **Not a code task; don't skip it.**
 
 ## Frontend → Firebase Hosting
 
-`firebase/firebase.json` already has the hosting config (`../frontend/dist`, SPA
-rewrite). Manual deploy:
+**Already deployed** → `https://hospital-queueless-dev.web.app`
+(the display board + live home-page status work now; interactive pages need the
+backend). The root `firebase.json` holds the hosting config.
+
+To redeploy (e.g. after the backend URL is known):
 
 ```bash
 cd frontend
-cp .env.example .env.production   # set VITE_API_BASE_URL=https://<BACKEND_URL>/api/v1  + the VITE_FIREBASE_* web config
+cp .env.example .env.production   # VITE_API_BASE_URL=https://<BACKEND_URL>/api/v1  + the VITE_FIREBASE_* web config
 npm run build
-cd ../firebase
-firebase deploy --only hosting --project <PROJECT_ID>
+cd ..
+GOOGLE_APPLICATION_CREDENTIALS=backend/serviceAccount.json \
+  firebase/node_modules/.bin/firebase deploy --only hosting --project <PROJECT_ID> --non-interactive
 ```
 
 Or let CI do it — add two repo secrets and every push to `main` deploys:

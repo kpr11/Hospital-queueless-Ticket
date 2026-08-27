@@ -1,20 +1,7 @@
 {
-  "_comment": "QueueLess Firebase config. From this directory: `firebase deploy --only database` (rules), `firebase deploy --only hosting` (frontend — build frontend/ first), `firebase deploy --only functions` (optional).",
+  "_comment": "Database rules + functions. From this directory: `firebase deploy --only database` / `--only functions`. Hosting is in the repo-root firebase.json (`firebase deploy --only hosting` from the root, after building frontend/).",
   "database": {
     "rules": "database.rules.json"
-  },
-  "hosting": {
-    "public": "../frontend/dist",
-    "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
-    "rewrites": [
-      { "source": "**", "destination": "/index.html" }
-    ],
-    "headers": [
-      {
-        "source": "/assets/**",
-        "headers": [{ "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }]
-      }
-    ]
   },
   "functions": [
     {
