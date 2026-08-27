@@ -12,6 +12,8 @@ import {
   apiListRegistrations,
   apiCancelRegistration,
   apiUpdateRegistration,
+  apiRegistrationSummary,
+  apiGetPatient,
 } from '../services/api.js';
 
 const STATUS_STYLE = {
@@ -37,6 +39,9 @@ export default function ReceptionDesk() {
   const [allFilter, setAllFilter] = useState('registered');
   const [editing, setEditing] = useState(null); // { id, name, age, gender, mobile, address, department }
   const [rowBusy, setRowBusy] = useState(null);
+  const [expanded, setExpanded] = useState(null); // patient detail (with token trail)
+  const [reprint, setReprint] = useState(null); // { token, patientName, department }
+  const [summary, setSummary] = useState(null);
 
   const loadAll = useCallback(() => {
     apiListRegistrations(allFilter ? { status: allFilter } : {})
@@ -47,9 +52,30 @@ export default function ReceptionDesk() {
   useEffect(() => {
     if (tab !== 'all') return;
     loadAll();
-    const id = setInterval(loadAll, 10000);
+    apiRegistrationSummary().then(setSummary).catch(() => {});
+    const id = setInterval(() => { loadAll(); apiRegistrationSummary().then(setSummary).catch(() => {}); }, 10000);
     return () => clearInterval(id);
   }, [tab, loadAll]);
+
+  const toggleExpand = async (id) => {
+    if (expanded?.id === id) { setExpanded(null); return; }
+    setExpanded({ id, loading: true });
+    try {
+      const r = await apiGetPatient(id);
+      setExpanded({ id, ...r.patient });
+    } catch {
+      setExpanded({ id, error: true });
+    }
+  };
+
+  const reprintToken = (p) => {
+    setReprint({
+      token: { number: p.tokenNumber, issuedAt: p.tokenIssuedAt, priority: p.priorityRequested ? 'priority' : 'normal' },
+      patientName: p.name,
+      department: p.department,
+    });
+    setTimeout(() => window.print(), 50);
+  };
 
   const cancelRow = async (id) => {
     if (!window.confirm('Cancel this registration? The patient will need to register again.')) return;
@@ -157,16 +183,16 @@ export default function ReceptionDesk() {
         </div>
       )}
 
-      <div className="flex gap-px bg-rule mb-8 w-fit">
+      <div className="flex flex-wrap gap-px bg-rule mb-8 border border-rule w-full sm:w-fit">
         {[
           ['register', 'Register walk-in'],
-          ['checkin', 'Check in & issue token'],
+          ['checkin', 'Check in & issue'],
           ['all', 'All registrations'],
         ].map(([t, label]) => (
           <button
             key={t}
             onClick={() => setTab(t)}
-            className={`px-5 py-2.5 text-sm font-medium ${tab === t ? 'bg-ink text-paper' : 'bg-paper text-graphite hover:text-ink'}`}
+            className={`flex-1 sm:flex-none px-4 sm:px-5 py-2.5 text-sm font-medium ${tab === t ? 'bg-ink text-paper' : 'bg-paper text-graphite hover:text-ink'}`}
           >
             {label}
           </button>
@@ -225,7 +251,7 @@ export default function ReceptionDesk() {
               </div>
               <div className="text-sm text-graphite">
                 <div className="text-ink font-medium">{issued.patient.name}</div>
-                <div>{labelOf(issued.token.service)}</div>
+                <div>{labelOf(issued.token.service)}{issued.token.priority === 'priority' && ' · priority'}</div>
                 <button onClick={() => window.print()} className="btn-secondary text-xs mt-2">Print</button>
                 <button onClick={() => setIssued(null)} className="btn-secondary text-xs mt-2 ml-2">Dismiss</button>
               </div>
@@ -255,13 +281,14 @@ export default function ReceptionDesk() {
                   <button
                     key={p.id}
                     onClick={() => { setSelected(p); setAadhaar(''); setIssueError(null); setIssued(null); }}
-                    className={`w-full text-left px-4 py-3 flex items-center justify-between text-sm ${selected?.id === p.id ? 'bg-ink text-paper' : 'hover:bg-paper'}`}
+                    className={`w-full text-left px-4 py-3 flex items-center justify-between gap-2 text-sm ${selected?.id === p.id ? 'bg-ink text-paper' : 'hover:bg-paper'} ${p.priorityRequested && selected?.id !== p.id ? 'bg-accent/5' : ''}`}
                   >
-                    <span>
+                    <span className="min-w-0">
                       <span className="font-medium">{p.name}</span>
-                      <span className={selected?.id === p.id ? 'text-paper/60' : 'text-graphite'}> · {p.age}/{p.gender[0].toUpperCase()} · {p.mobile}</span>
+                      {p.priorityRequested && <span className="ml-1.5 text-[10px] font-bold text-accent" title="Priority">P</span>}
+                      <span className={`block sm:inline sm:ml-1 ${selected?.id === p.id ? 'text-paper/60' : 'text-graphite'}`}>{p.age}/{p.gender[0].toUpperCase()} · {p.mobile}</span>
                     </span>
-                    <span className={`font-mono text-xs ${selected?.id === p.id ? 'text-paper/60' : 'text-graphite'}`}>
+                    <span className={`font-mono text-xs shrink-0 ${selected?.id === p.id ? 'text-paper/60' : 'text-graphite'}`}>
                       XXXX {p.aadhaarLast4}
                     </span>
                   </button>
@@ -303,7 +330,33 @@ export default function ReceptionDesk() {
       {/* ---- All registrations ---- */}
       {tab === 'all' && (
         <div className="space-y-4">
-          <div className="flex gap-2 flex-wrap">
+          {reprint && (
+            <PrintableTokenSlip
+              token={reprint.token}
+              patientName={reprint.patientName}
+              departmentLabel={labelOf(reprint.department)}
+              orgName={cfg.orgName}
+              location={cfg.location}
+            />
+          )}
+
+          {summary && (
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-px bg-rule border border-rule print:hidden">
+              {[
+                ['Registered today', summary.total],
+                ['Waiting', summary.registered],
+                ['Issued', summary.tokenIssued],
+                ['Cancelled / expired', summary.cancelled + summary.expired],
+              ].map(([k, v]) => (
+                <div key={k} className="bg-paper p-3">
+                  <div className="label text-[10px]">{k}</div>
+                  <div className="font-display text-2xl tracking-tightest num mt-0.5">{v}</div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div className="flex gap-2 flex-wrap print:hidden">
             {['registered', 'tokenIssued', 'cancelled', 'expired', ''].map((s) => (
               <button
                 key={s || 'all'}
@@ -358,31 +411,62 @@ export default function ReceptionDesk() {
                       </div>
                     </div>
                   ) : (
-                    <div className="flex items-center justify-between gap-3 flex-wrap">
-                      <span>
-                        <span className="font-medium text-ink">{p.name}</span>
-                        <span className="text-graphite"> · {p.age}/{p.gender[0].toUpperCase()} · {p.mobile} · {labelOf(p.department)}</span>
-                        {p.status === 'tokenIssued' && <span className="text-success"> · token #{p.tokenNumber}</span>}
-                      </span>
-                      <span className="flex items-center gap-2">
-                        <span className={`text-[10px] tracking-[0.15em] uppercase px-2 py-0.5 border ${STATUS_STYLE[p.status] || 'border-rule text-graphite'}`}>
-                          {p.status === 'tokenIssued' ? 'issued' : p.status}
+                    <>
+                      <div className="flex items-start justify-between gap-3 flex-wrap">
+                        <button onClick={() => toggleExpand(p.id)} className="text-left min-w-0">
+                          <span className="font-medium text-ink">{p.name}</span>
+                          {p.priorityRequested && <span className="ml-1.5 text-[10px] text-accent font-bold" title="Priority">P</span>}
+                          <span className="text-graphite block sm:inline sm:ml-1"> {p.age}/{p.gender[0].toUpperCase()} · {p.mobile} · {labelOf(p.department)}</span>
+                          {p.status === 'tokenIssued' && <span className="text-success"> · token #{p.tokenNumber}</span>}
+                        </button>
+                        <span className="flex items-center gap-2 shrink-0">
+                          <span className={`text-[10px] tracking-[0.15em] uppercase px-2 py-0.5 border ${STATUS_STYLE[p.status] || 'border-rule text-graphite'}`}>
+                            {p.status === 'tokenIssued' ? 'issued' : p.status}
+                          </span>
+                          {p.status === 'registered' && (
+                            <>
+                              <button
+                                onClick={() => setEditing({ id: p.id, name: p.name, age: p.age, gender: p.gender, mobile: p.mobile, address: p.address, department: p.department })}
+                                className="text-xs underline text-graphite hover:text-ink"
+                              >Edit</button>
+                              <button
+                                onClick={() => cancelRow(p.id)}
+                                disabled={rowBusy === p.id}
+                                className="text-xs underline text-accent-deep hover:text-accent disabled:opacity-40"
+                              >Cancel</button>
+                            </>
+                          )}
+                          {p.status === 'tokenIssued' && (
+                            <button onClick={() => reprintToken(p)} className="text-xs underline text-graphite hover:text-ink">Reprint</button>
+                          )}
                         </span>
-                        {p.status === 'registered' && (
-                          <>
-                            <button
-                              onClick={() => setEditing({ id: p.id, name: p.name, age: p.age, gender: p.gender, mobile: p.mobile, address: p.address, department: p.department })}
-                              className="text-xs underline text-graphite hover:text-ink"
-                            >Edit</button>
-                            <button
-                              onClick={() => cancelRow(p.id)}
-                              disabled={rowBusy === p.id}
-                              className="text-xs underline text-accent-deep hover:text-accent disabled:opacity-40"
-                            >Cancel</button>
-                          </>
-                        )}
-                      </span>
-                    </div>
+                      </div>
+
+                      {expanded?.id === p.id && (
+                        <div className="mt-3 pt-3 border-t border-rule text-xs text-graphite space-y-1">
+                          {expanded.loading && <div className="animate-pulse">Loading…</div>}
+                          {expanded.error && <div>Could not load details.</div>}
+                          {!expanded.loading && !expanded.error && (
+                            <>
+                              <div>Address: {expanded.address}</div>
+                              <div>Source: {expanded.source === 'self' ? 'self-service' : `reception (${expanded.registeredBy || '—'})`}</div>
+                              {expanded.priorityRequested && <div className="text-accent-deep">Priority{expanded.priorityReason ? ` — ${expanded.priorityReason}` : ''}</div>}
+                              <div>Registered: {new Date(expanded.registeredAt).toLocaleString()}</div>
+                              {expanded.token && (
+                                <div className="mt-1">
+                                  Token #{expanded.token.number} · {labelOf(expanded.token.service)} · {expanded.token.status}
+                                  {expanded.token.referralHistory?.length > 0 && (
+                                    <div className="mt-1">
+                                      Trail: {[expanded.token.referralHistory[0].fromService, ...expanded.token.referralHistory.map(h => h.toService)].map(s => labelOf(s)).join(' → ')}
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                            </>
+                          )}
+                        </div>
+                      )}
+                    </>
                   )}
                 </div>
               ))}

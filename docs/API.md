@@ -26,6 +26,28 @@ Auth tiers: **public** · **staff** (staff or any admin tier) ·
 | POST | `/appointments` | public | Book appointment `{name, service, date, timeSlot}` |
 | POST | `/feedback` | public | Rate a served token `{tokenId, rating, comment?}` |
 
+## Hospital patients (Medical industry)
+
+Two-step flow: **register** the patient, then the department desk **verifies the
+Aadhaar number and issues a token**. Only a salted HMAC of the Aadhaar plus the
+last 4 digits are stored — the raw number is never persisted or returned.
+
+| Method | Endpoint | Auth | Description |
+|--------|----------|------|-------------|
+| POST | `/patients/register` | public (rate-limited 5/min) | Self-service registration. Body: `{name, age, gender, mobile, address, aadhaar, department, consent:true, priorityRequested?, priorityReason?}`. `consent` is required; a hidden `website` honeypot field must be empty. |
+| POST | `/patients/reception/register` | staff | Same body — reception registering a walk-in. |
+| GET | `/patients/:id/status` | public | Minimal status for the confirmation-QR page: `{firstName, department, aadhaarLast4, status, tokenNumber?}`. The id is an unguessable UUID capability. |
+| GET | `/patients/pending?department=` | staff | Pending (not-yet-checked-in) registrations for a department. Staff are locked to their own counter. |
+| GET | `/patients/registrations?status=&department=&limit=` | staff | All registrations, newest first. |
+| GET | `/patients/summary?department=` | staff | Today's counts `{registered, tokenIssued, cancelled, expired, total}`. |
+| GET | `/patients/:id` | staff | Full record + linked token status & referral trail. |
+| PUT | `/patients/:id` | staff | Edit demographics / priority on a *pending* registration. |
+| POST | `/patients/:id/cancel` | staff | Cancel a pending registration. |
+| POST | `/patients/verify-issue` | staff | Body: `{aadhaar, department?, patientId?}`. On an Aadhaar match, issues a token for the department (priority if the department is `emergency` or priority was requested). 422 on mismatch, 404 if no pending registration, 409 if already issued. |
+
+Stale `registered` records are auto-marked `expired` after
+`PATIENT_REGISTRATION_TTL_HOURS` (default 12) by a background sweeper.
+
 ## Auth
 
 | Method | Endpoint | Auth | Description |
@@ -56,6 +78,7 @@ Auth tiers: **public** · **staff** (staff or any admin tier) ·
 | GET | `/admin/queues` | List (incl. archived) |
 | GET | `/admin/queues/overview` | Live cards: waiting, serving, est. wait |
 | POST | `/admin/queues` | Create `{label, prefix?, capacity?, avgServiceSeconds?, workingHours?}` |
+| POST | `/admin/queues/seed-defaults` | Create any missing default queues for `{industry?}` (defaults to the org's industry). Idempotent; also runs automatically when the industry is changed. |
 | GET/PUT | `/admin/queues/:id` | Fetch / edit |
 | PUT | `/admin/queues/:id/enabled` · `/archive` | Toggle / archive |
 | DELETE | `/admin/queues/:id` | Delete (blocked while active tokens exist) |

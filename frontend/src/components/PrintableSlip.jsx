@@ -42,18 +42,20 @@ function Frame({ orgName, location, kicker, big, rows, footer }) {
 
 export function PrintableRegistration({ patient, departmentLabel, orgName, location }) {
   if (!patient) return null;
+  const rows = [
+    ['Department', departmentLabel],
+    ['Aadhaar', `XXXX XXXX ${patient.aadhaarLast4}`],
+    ['Mobile', patient.mobile],
+    ['Registered', new Date(patient.registeredAt).toLocaleString()],
+  ];
+  if (patient.priorityRequested) rows.push(['Priority', 'Yes']);
   return (
     <Frame
       orgName={orgName}
       location={location}
       kicker="Visit registration"
       big={patient.name}
-      rows={[
-        ['Department', departmentLabel],
-        ['Aadhaar', `XXXX XXXX ${patient.aadhaarLast4}`],
-        ['Mobile', patient.mobile],
-        ['Registered', new Date(patient.registeredAt).toLocaleString()],
-      ]}
+      rows={rows}
       footer={`Go to the ${departmentLabel} desk and give your Aadhaar number to collect your token.`}
     />
   );
@@ -61,16 +63,18 @@ export function PrintableRegistration({ patient, departmentLabel, orgName, locat
 
 export function PrintableTokenSlip({ token, patientName, departmentLabel, orgName, location }) {
   if (!token) return null;
+  const rows = [
+    ['Patient', patientName || '—'],
+    ['Issued', new Date(token.issuedAt || token.tokenIssuedAt || Date.now()).toLocaleString()],
+  ];
+  if (token.priority === 'priority') rows.push(['Priority', 'Yes']);
   return (
     <Frame
       orgName={orgName}
       location={location}
       kicker={departmentLabel}
       big={`#${String(token.number).padStart(2, '0')}`}
-      rows={[
-        ['Patient', patientName || '—'],
-        ['Issued', new Date(token.issuedAt || Date.now()).toLocaleString()],
-      ]}
+      rows={rows}
       footer="Please wait until your number is called on the display board."
     />
   );

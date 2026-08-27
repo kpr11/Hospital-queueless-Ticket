@@ -3,6 +3,7 @@ import { useQueues } from '../hooks/useQueues.js';
 
 export const EMPTY_PATIENT_FORM = {
   name: '', age: '', gender: '', mobile: '', address: '', aadhaar: '', department: '',
+  priorityRequested: false, priorityReason: '',
   consent: false, website: '',
 };
 
@@ -35,6 +36,8 @@ export default function PatientForm({ onSubmit, busy, error, submitLabel = 'Regi
     form.department &&
     form.consent === true;
 
+  const isEmergency = form.department === 'emergency';
+
   const submit = (e) => {
     e.preventDefault();
     if (!complete || busy) return;
@@ -42,6 +45,8 @@ export default function PatientForm({ onSubmit, busy, error, submitLabel = 'Regi
       ...form,
       aadhaar: aadhaarDigits,
       mobile: form.mobile.replace(/\D/g, ''),
+      priorityRequested: form.priorityRequested || isEmergency,
+      priorityReason: (form.priorityRequested && form.priorityReason.trim()) || null,
       consent: true,
     });
   };
@@ -110,6 +115,36 @@ export default function PatientForm({ onSubmit, busy, error, submitLabel = 'Regi
           ))}
         </select>
       </label>
+
+      {isEmergency ? (
+        <div className="p-3 border border-accent bg-accent/5 text-accent-deep text-sm">
+          Emergency is served ahead of the regular queue automatically.
+        </div>
+      ) : (
+        <div>
+          <label className="flex items-start gap-3 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={form.priorityRequested}
+              onChange={(e) => setForm((f) => ({ ...f, priorityRequested: e.target.checked }))}
+              className="mt-0.5 w-4 h-4 border-rule accent-ink cursor-pointer shrink-0"
+            />
+            <span className="text-xs text-graphite leading-relaxed">
+              Request priority — for elderly, disabled, pregnant, or medical urgency.
+              Priority patients are called before the regular queue.
+            </span>
+          </label>
+          {form.priorityRequested && (
+            <input
+              value={form.priorityReason}
+              onChange={set('priorityReason')}
+              maxLength={200}
+              placeholder="Reason (optional) — e.g. 78 years old, wheelchair"
+              className={`${field} mt-2`}
+            />
+          )}
+        </div>
+      )}
 
       {/* Honeypot — hidden from humans, catches bots that fill every field. */}
       <div aria-hidden="true" style={{ position: 'absolute', left: '-9999px', width: '1px', height: '1px', overflow: 'hidden' }}>

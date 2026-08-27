@@ -33,6 +33,12 @@ Customer browser ──REST──▶ Express API ──Admin SDK──▶ Fireba
 - **Clients cannot write operational or content-bearing RTDB data** — those
   writes go through the JWT API. Scoped staff presence is the only direct
   client-write exception.
+- **`hospital/patients`** (Medical industry) holds patient PII — demographics
+  plus a **salted HMAC of the Aadhaar number** and its last 4 digits (never the
+  raw number). Backend-only via the Admin SDK; `.read`/`.write` denied to
+  clients. Served exclusively through `/api/v1/patients/*` (a public
+  `:id/status` endpoint returns only a first name + status). A background
+  sweeper expires stale un-checked-in registrations.
 - **MongoDB + CSV** are the analytical event log (dual-write, both optional).
 
 ## Real-time model (no Firebase Auth required)

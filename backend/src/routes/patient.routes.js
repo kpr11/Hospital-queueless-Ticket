@@ -32,6 +32,8 @@ const registerSchema = Joi.object({
   aadhaar: Joi.string().trim().min(12).max(19).required(),
   consent: Joi.boolean().truthy('true').valid(true).required()
     .messages({ 'any.only': 'Consent to store your details is required to register.' }),
+  priorityRequested: Joi.boolean().truthy('true').falsy('false').default(false),
+  priorityReason: Joi.string().trim().max(200).allow('', null).optional(),
   // Honeypot — must be absent/empty. Bots that fill every field trip this.
   website: Joi.string().allow('', null).max(0).optional(),
 });
@@ -43,6 +45,8 @@ const updateSchema = Joi.object({
   mobile: Joi.string().trim().pattern(/^[6-9]\d{9}$/),
   address: Joi.string().trim().min(1).max(300),
   department: Joi.string().trim().min(1).max(50),
+  priorityRequested: Joi.boolean().truthy('true').falsy('false'),
+  priorityReason: Joi.string().trim().max(200).allow('', null),
 }).min(1);
 
 const verifyIssueSchema = Joi.object({
@@ -57,6 +61,8 @@ router.post('/register',           registerLimiter, validate(registerSchema),   
 router.post('/reception/register', requireStaff,    validate(registerSchema),     asyncHandler(controller.receptionRegister));
 router.get('/pending',             requireStaff,                                  asyncHandler(controller.listPending));
 router.get('/registrations',       requireStaff,                                  asyncHandler(controller.listRegistrations));
+router.get('/summary',             requireStaff,                                  asyncHandler(controller.summary));
+router.get('/:id/status',          validate(idParamSchema, 'params'),             asyncHandler(controller.status));
 router.post('/verify-issue',       requireStaff,    validate(verifyIssueSchema),  asyncHandler(controller.verifyAndIssue));
 router.get('/:id',                 requireStaff,    validate(idParamSchema, 'params'), asyncHandler(controller.getOne));
 router.put('/:id',                 requireStaff,    validate(idParamSchema, 'params'), validate(updateSchema), asyncHandler(controller.update));

@@ -7,6 +7,7 @@ import { StaffProvider } from './context/StaffContext.jsx';
 const Home = lazy(() => import('./pages/Home.jsx'));
 const TakeToken = lazy(() => import('./pages/TakeToken.jsx'));
 const PatientRegister = lazy(() => import('./pages/PatientRegister.jsx'));
+const RegistrationStatus = lazy(() => import('./pages/RegistrationStatus.jsx'));
 const ReceptionDesk = lazy(() => import('./pages/ReceptionDesk.jsx'));
 const MyToken = lazy(() => import('./pages/MyToken.jsx'));
 const Lookup = lazy(() => import('./pages/Lookup.jsx'));
@@ -53,6 +54,7 @@ export default function App() {
             <Route path="/"                   element={<Home />} />
             <Route path="/take"               element={<TakeToken />} />
             <Route path="/register"           element={<PatientRegister />} />
+            <Route path="/registration/:id"   element={<RegistrationStatus />} />
             <Route path="/credits"            element={<Credits />} />
             <Route path="/notifications"      element={<Notifications />} />
             <Route path="/assistant"          element={<AssistantWorkspace />} />

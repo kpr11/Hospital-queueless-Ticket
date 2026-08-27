@@ -15,10 +15,12 @@ export default function PatientRegister() {
   const [done, setDone] = useState(null); // the sanitised patient record
   const [qr, setQr] = useState(null);
 
+  const statusUrl = done ? `${window.location.origin}/registration/${done.id}` : null;
+
   useEffect(() => {
-    if (!done?.id) return;
-    QRCode.toDataURL(done.id, { width: 180, margin: 1 }).then(setQr).catch(() => {});
-  }, [done]);
+    if (!statusUrl) return;
+    QRCode.toDataURL(statusUrl, { width: 180, margin: 1 }).then(setQr).catch(() => {});
+  }, [statusUrl]);
 
   const handleSubmit = async (form) => {
     setBusy(true);
@@ -53,22 +55,29 @@ export default function PatientRegister() {
           Go to the <span className="font-medium text-ink">{labelOf(done.department)}</span> desk and give
           your Aadhaar number. The staff will verify it and hand you your token number.
         </p>
+        {done.priorityRequested && (
+          <p className="mt-2 text-sm text-accent-deep">
+            You're flagged for priority — you'll be called ahead of the regular queue.
+          </p>
+        )}
 
         <div className="mt-8 border border-rule bg-cream p-6 flex flex-col sm:flex-row gap-6 sm:items-center">
-          {qr && <img src={qr} alt="Registration code" className="w-36 h-36 shrink-0" />}
+          {qr && <img src={qr} alt="Scan to check your registration status" className="w-36 h-36 shrink-0" />}
           <div className="text-sm">
             <div className="label">Registered for</div>
             <div className="font-display text-2xl tracking-tightest mt-1">{labelOf(done.department)}</div>
             <div className="mt-3 label">Aadhaar on file</div>
             <div className="font-mono mt-1">XXXX XXXX {done.aadhaarLast4}</div>
             <p className="mt-3 text-xs text-graphite">
-              Show this code at the desk to be found faster — or just give your Aadhaar number.
+              Scan this to check your status and see your token number the moment it's issued.
+              At the desk, just give your Aadhaar number.
             </p>
           </div>
         </div>
 
-        <div className="mt-8 flex gap-4">
+        <div className="mt-8 flex flex-wrap gap-4">
           <button onClick={() => window.print()} className="btn-secondary">Print</button>
+          <Link to={`/registration/${done.id}`} className="btn-secondary">Check my status</Link>
           <button onClick={() => { setDone(null); setQr(null); }} className="btn-secondary">Register another patient</button>
           <Link to="/" className="btn-secondary">Home</Link>
         </div>

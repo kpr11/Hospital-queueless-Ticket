@@ -15,6 +15,8 @@ const buildPayload = (form) => ({
   address: form.address?.trim(),
   aadhaar: String(form.aadhaar || '').replace(/[\s-]/g, ''),
   department: form.department,
+  priorityRequested: form.priorityRequested === true,
+  priorityReason: form.priorityReason || undefined,
   consent: form.consent === true,
   website: form.website || '',
 });
@@ -41,6 +43,14 @@ export const apiVerifyAndIssueToken = ({ patientId, aadhaar, department }) =>
 
 export const apiGetPatient = (id) =>
   api.get(`/patients/${id}`).then(r => r.data);
+
+// Public — a patient checking their own registration (confirmation QR).
+export const apiRegistrationStatus = (id) =>
+  api.get(`/patients/${id}/status`).then(r => r.data);
+
+// Desk header — today's registration counts.
+export const apiRegistrationSummary = (department) =>
+  api.get('/patients/summary', { params: department ? { department } : {} }).then(r => r.data);
 
 // Admin overview — all registrations, optionally filtered by status/department.
 export const apiListRegistrations = (params = {}) =>

@@ -1047,4 +1047,47 @@ describe('Patient registration & Aadhaar-verified token issuance', () => {
     expect(res.status).toBe(201);
     expect(res.body.token.service).toBe('opd');
   });
+
+  test('a priority request at registration yields a priority token', async () => {
+    await request(app).post('/api/v1/patients/register')
+      .send(patientBody({ department: 'dermatology', aadhaar: '789456123014', mobile: '9870000030', name: 'Elderly P', priorityRequested: true, priorityReason: '80 yrs' }));
+    const issue = await request(app).post('/api/v1/patients/verify-issue')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ aadhaar: '789456123014', department: 'dermatology' });
+    expect(issue.status).toBe(201);
+    expect(issue.body.token.priority).toBe('priority');
+    expect(issue.body.token.note).toBe('80 yrs');
+  });
+
+  test('the Emergency department is always priority even without an explicit request', async () => {
+    await request(app).post('/api/v1/patients/register')
+      .send(patientBody({ department: 'emergency', aadhaar: '555444333229', mobile: '9870000031', name: 'Trauma P' }));
+    const issue = await request(app).post('/api/v1/patients/verify-issue')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ aadhaar: '555444333229', department: 'emergency' });
+    expect(issue.status).toBe(201);
+    expect(issue.body.token.priority).toBe('priority');
+  });
+
+  test('public status endpoint returns minimal fields and no secrets', async () => {
+    const reg = await request(app).post('/api/v1/patients/register')
+      .send(patientBody({ department: 'lab', aadhaar: '789456123014', mobile: '9870000032', name: 'Status Check' }));
+    const id = reg.body.patient.id;
+
+    const st = await request(app).get(`/api/v1/patients/${id}/status`); // no auth
+    expect(st.status).toBe(200);
+    expect(st.body.firstName).toBe('Status');
+    expect(st.body.status).toBe('registered');
+    expect(st.body.aadhaarHash).toBeUndefined();
+    expect(st.body.mobile).toBeUndefined();
+    expect(st.body.address).toBeUndefined();
+  });
+
+  test('the summary endpoint reports today\'s registration counts', async () => {
+    const res = await request(app).get('/api/v1/patients/summary')
+      .set('Authorization', `Bearer ${adminToken}`);
+    expect(res.status).toBe(200);
+    expect(res.body.total).toBeGreaterThanOrEqual(1);
+    expect(typeof res.body.tokenIssued).toBe('number');
+  });
 });

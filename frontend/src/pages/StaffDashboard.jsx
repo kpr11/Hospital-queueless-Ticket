@@ -356,9 +356,10 @@ export default function StaffDashboard() {
               ) : (
                 <div className="border border-rule divide-y divide-rule">
                   {pendingPatients.map(p => (
-                    <div key={p.id} className="px-3 py-2 flex items-center justify-between text-xs">
+                    <div key={p.id} className={`px-3 py-2 flex items-center justify-between text-xs ${p.priorityRequested ? 'bg-accent/5' : ''}`}>
                       <span>
                         <span className="font-medium text-ink">{p.name}</span>
+                        {p.priorityRequested && <span className="ml-1.5 text-accent font-bold" title="Priority">P</span>}
                         <span className="text-graphite"> · {p.age}/{p.gender[0].toUpperCase()} · {p.mobile}</span>
                       </span>
                       <span className="font-mono text-graphite">XXXX {p.aadhaarLast4}</span>

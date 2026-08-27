@@ -73,9 +73,16 @@ function validateDemographics({ name, age, gender, mobile, address, department }
   return { name: cleanName, age: numericAge, gender, mobile: cleanMobile, address: cleanAddress, department: cleanDept };
 }
 
+const EMERGENCY_DEPT = 'emergency';
+
+/** Whether a registration should be served ahead of the normal queue. */
+function priorityFor(department, priorityRequested) {
+  return department === EMERGENCY_DEPT || priorityRequested === true || priorityRequested === 'true';
+}
+
 async function registerPatient({
   name, age, gender, mobile, address, aadhaar, department,
-  consent, website,
+  consent, website, priorityRequested = false, priorityReason = null,
   source = 'self', registeredBy = null,
 } = {}) {
   // Honeypot: a real form leaves `website` empty; bots fill every field.
@@ -121,6 +128,8 @@ async function registerPatient({
     aadhaarHash,
     aadhaarLast4: last4(normalisedAadhaar),
     department: cleanDept,
+    priorityRequested: priorityFor(cleanDept, priorityRequested),
+    priorityReason: priorityReason ? String(priorityReason).trim().slice(0, 200) : null,
     source: source === 'reception' ? 'reception' : 'self',
     registeredBy: registeredBy || null,
     registeredAt: now,
@@ -157,7 +166,61 @@ async function listPendingRegistrations(department) {
 async function getPatient(patientId) {
   const snap = await refs.patient(patientId).once('value');
   if (!snap.exists()) throw bad('Patient not found.', 404);
-  return sanitise(snap.val());
+  const patient = sanitise(snap.val());
+  // Enrich with the linked token's live status + referral trail, if issued.
+  if (patient.tokenId) {
+    try {
+      const tSnap = await refs.token(patient.tokenId).once('value');
+      if (tSnap.exists()) {
+        const t = tSnap.val();
+        patient.token = {
+          id: t.id, number: t.number, service: t.service, status: t.status,
+          priority: t.priority, referred: t.referred || false,
+          referralHistory: Array.isArray(t.referralHistory) ? t.referralHistory : [],
+          calledAt: t.calledAt || null, servedAt: t.servedAt || null,
+        };
+      }
+    } catch { /* token lookup is best-effort */ }
+  }
+  return patient;
+}
+
+/**
+ * Public, minimal status for a patient to check their own registration
+ * (reached via the QR on the confirmation slip). No demographics beyond the
+ * first name; the id is an unguessable UUID acting as a capability token.
+ */
+async function getRegistrationStatus(patientId) {
+  const snap = await refs.patient(patientId).once('value');
+  if (!snap.exists()) throw bad('Registration not found.', 404);
+  const p = snap.val();
+  return {
+    id: p.id,
+    firstName: String(p.name || '').split(' ')[0],
+    department: p.department,
+    aadhaarLast4: p.aadhaarLast4,
+    priorityRequested: !!p.priorityRequested,
+    status: p.status,
+    registeredAt: p.registeredAt,
+    tokenId: p.tokenId || null,
+    tokenNumber: p.tokenNumber || null,
+    tokenIssuedAt: p.tokenIssuedAt || null,
+  };
+}
+
+/** Today's registration counts for a department (or all), for the desk header. */
+async function registrationSummary(department = null) {
+  const startOfDay = new Date(); startOfDay.setHours(0, 0, 0, 0);
+  const since = startOfDay.getTime();
+  const all = await allPatients();
+  const today = all.filter(p => p.registeredAt >= since && (!department || p.department === department));
+  return {
+    registered: today.filter(p => p.status === STATUS.REGISTERED).length,
+    tokenIssued: today.filter(p => p.status === STATUS.TOKEN_ISSUED).length,
+    cancelled: today.filter(p => p.status === STATUS.CANCELLED).length,
+    expired: today.filter(p => p.status === STATUS.EXPIRED).length,
+    total: today.length,
+  };
 }
 
 /** Admin view of registrations, newest first, optionally filtered. */
@@ -189,6 +252,15 @@ async function updatePatient(patientId, patch = {}) {
     mobile: clean.mobile, address: clean.address, department: clean.department,
     updatedAt: Date.now(),
   };
+  if (patch.priorityRequested !== undefined) {
+    updates.priorityRequested = priorityFor(clean.department, patch.priorityRequested);
+  } else {
+    // department may have changed to/from emergency — keep the flag consistent
+    updates.priorityRequested = priorityFor(clean.department, current.priorityRequested);
+  }
+  if (patch.priorityReason !== undefined) {
+    updates.priorityReason = patch.priorityReason ? String(patch.priorityReason).trim().slice(0, 200) : null;
+  }
   await refs.patient(patientId).update(updates);
   return sanitise({ ...current, ...updates });
 }
@@ -264,11 +336,14 @@ async function verifyAndIssueToken({ patientId = null, aadhaar, department, issu
     throw bad(`A token (#${patientRecord.tokenNumber}) has already been issued to this patient.`, 409);
   }
 
+  // Emergency dept, or a priority request made at registration, is served first.
+  const priority = priorityFor(dept, patientRecord.priorityRequested) ? 'priority' : 'normal';
   const token = await queueService.issueToken({
     service: dept,
     patientName: patientRecord.name,
-    priority: 'normal',
+    priority,
     patientId: patientRecord.id,
+    note: patientRecord.priorityReason || null,
   });
 
   const now = Date.now();
@@ -308,6 +383,8 @@ module.exports = {
   listPendingRegistrations,
   listRegistrations,
   getPatient,
+  getRegistrationStatus,
+  registrationSummary,
   updatePatient,
   cancelRegistration,
   expireStaleRegistrations,

@@ -43,7 +43,6 @@ async function listPending(req, res) {
 
 // requireStaff — all registrations (admin overview). Staff see only their counter.
 async function listRegistrations(req, res) {
-  const { isAdminTier } = require('../config/roles');
   const department = isAdminTier(req.user.role)
     ? (req.query.department || null)
     : req.user.service;
@@ -51,6 +50,17 @@ async function listRegistrations(req, res) {
   const limit = req.query.limit ? parseInt(req.query.limit, 10) : 200;
   const patients = await patientService.listRegistrations({ status, department, limit });
   res.json({ patients });
+}
+
+// requireStaff — today's registration counts (desk header).
+async function summary(req, res) {
+  const department = isAdminTier(req.user.role) ? (req.query.department || null) : req.user.service;
+  res.json(await patientService.registrationSummary(department));
+}
+
+// PUBLIC — a patient checking their own registration via the confirmation QR.
+async function status(req, res) {
+  res.json(await patientService.getRegistrationStatus(req.params.id));
 }
 
 // requireStaff — edit demographics on a pending registration.
@@ -91,7 +101,7 @@ async function getOne(req, res) {
 
 module.exports = {
   register, receptionRegister,
-  listPending, listRegistrations, getOne,
+  listPending, listRegistrations, summary, status, getOne,
   update, cancel,
   verifyAndIssue,
 };
