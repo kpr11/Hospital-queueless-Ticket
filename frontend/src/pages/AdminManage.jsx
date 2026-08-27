@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Navigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
-import { apiListAdmins, apiCreateAdmin, apiDeleteAdmin, apiSetAdminRole } from '../services/api.js';
+import { apiListAdmins, apiCreateAdmin, apiDeleteAdmin, apiSetAdminRole, apiResetAdminPassword } from '../services/api.js';
 
 const ROLE_LABEL = { superadmin: 'Super Admin', admin: 'Admin', manager: 'Manager' };
 
@@ -15,6 +15,7 @@ export default function AdminManage() {
   const [form, setForm] = useState({ username: '', password: '', displayName: '', role: 'admin' });
   const [formError, setFormError] = useState(null);
   const [deleting, setDeleting] = useState(null);
+  const [resetting, setResetting] = useState(null);
 
   const changeRole = async (username, role) => {
     try {
@@ -45,6 +46,23 @@ export default function AdminManage() {
       setFormError(e.response?.data?.error || 'Could not create admin account.');
     } finally {
       setCreating(false);
+    }
+  };
+
+  const handleResetPassword = async (username) => {
+    if (!window.confirm(`Reset the password for "${username}"? A new one will be generated and shown once.`)) return;
+    setResetting(username);
+    try {
+      const res = await apiResetAdminPassword(username);
+      window.alert(
+        res.generatedPassword
+          ? `New password for "${username}":\n\n${res.generatedPassword}\n\nCopy it now — it won't be shown again. Have them change it after logging in.`
+          : `Password for "${username}" reset.`
+      );
+    } catch (e) {
+      alert(e.response?.data?.error || 'Could not reset password.');
+    } finally {
+      setResetting(null);
     }
   };
 
@@ -123,17 +141,28 @@ export default function AdminManage() {
                     <span className="text-graphite">{ROLE_LABEL[adm.role] || adm.role || 'Admin'}</span>
                   )}
                 </div>
-                <div className="col-span-2 text-right">
+                <div className="col-span-2 text-right space-x-3">
                   {adm.username === user.username ? (
                     <span className="text-xs text-ash">—</span>
                   ) : (
-                    <button
-                      onClick={() => handleDelete(adm.username)}
-                      disabled={deleting === adm.username}
-                      className="text-xs text-accent hover:underline disabled:opacity-40"
-                    >
-                      {deleting === adm.username ? '…' : 'Remove'}
-                    </button>
+                    <>
+                      {isSuperadmin && (
+                        <button
+                          onClick={() => handleResetPassword(adm.username)}
+                          disabled={resetting === adm.username}
+                          className="text-xs text-graphite hover:underline disabled:opacity-40"
+                        >
+                          {resetting === adm.username ? '…' : 'Reset password'}
+                        </button>
+                      )}
+                      <button
+                        onClick={() => handleDelete(adm.username)}
+                        disabled={deleting === adm.username}
+                        className="text-xs text-accent hover:underline disabled:opacity-40"
+                      >
+                        {deleting === adm.username ? '…' : 'Remove'}
+                      </button>
+                    </>
                   )}
                 </div>
               </div>

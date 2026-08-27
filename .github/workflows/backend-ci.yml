@@ -83,3 +83,23 @@ jobs:
           fi
           curl -fsS -X POST "$RENDER_DEPLOY_HOOK"
           echo "Render deployment triggered."
+
+  smoke:
+    name: Post-deploy smoke (read-only)
+    needs: deploy
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run smoke test
+        env:
+          BASE_URL: ${{ secrets.SMOKE_BASE_URL }}
+          ADMIN_USER: ${{ secrets.SMOKE_ADMIN_USER }}
+          ADMIN_PASS: ${{ secrets.SMOKE_ADMIN_PASS }}
+        run: |
+          if [ -z "$BASE_URL" ]; then
+            echo "::notice::SMOKE_BASE_URL not set — skipping smoke test."
+            exit 0
+          fi
+          sleep 60   # give Render a moment to roll the new build
+          SMOKE_READONLY=1 node scripts/smoke.js

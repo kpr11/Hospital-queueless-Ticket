@@ -49,6 +49,16 @@ async function main() {
   process.on('SIGINT', () => shutdown('SIGINT'));
 }
 
+const { reportError } = require('./utils/reportError');
+process.on('unhandledRejection', (reason) => {
+  reportError({ source: 'backend', message: `unhandledRejection: ${reason?.message || reason}`, stack: reason?.stack });
+});
+process.on('uncaughtException', (err) => {
+  reportError({ source: 'backend', message: `uncaughtException: ${err.message}`, stack: err.stack });
+  // Let the process crash so the platform restarts it cleanly.
+  setTimeout(() => process.exit(1), 500).unref();
+});
+
 main().catch(err => {
   console.error('[boot] Fatal error:', err);
   process.exit(1);

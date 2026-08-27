@@ -1,0 +1,56 @@
+name: RTDB Backup
+
+# Daily full export of the Realtime Database, kept as a build artifact for 30
+# days. Needs the FIREBASE_SERVICE_ACCOUNT repo secret; skips cleanly without it.
+
+on:
+  schedule:
+    - cron: '17 2 * * *'   # 02:17 UTC daily
+  workflow_dispatch: {}
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check for service account
+        id: gate
+        env:
+          SA: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          if [ -z "$SA" ]; then
+            echo "::notice::FIREBASE_SERVICE_ACCOUNT not set — skipping backup."
+            echo "go=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "go=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Setup Node
+        if: steps.gate.outputs.go == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+          cache-dependency-path: './backend/package-lock.json'
+
+      - name: Install firebase-admin
+        if: steps.gate.outputs.go == 'true'
+        working-directory: backend
+        run: npm ci --omit=dev --ignore-scripts || npm ci
+
+      - name: Run backup
+        if: steps.gate.outputs.go == 'true'
+        env:
+          FIREBASE_DATABASE_URL: ${{ secrets.FIREBASE_DATABASE_URL }}
+        run: |
+          printf '%s' '${{ secrets.FIREBASE_SERVICE_ACCOUNT }}' > "$RUNNER_TEMP/sa.json"
+          GOOGLE_APPLICATION_CREDENTIALS="$RUNNER_TEMP/sa.json" node firebase/backup.js "$RUNNER_TEMP/backups"
+
+      - name: Upload artifact
+        if: steps.gate.outputs.go == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: rtdb-backup-${{ github.run_id }}
+          path: ${{ runner.temp }}/backups/*.json
+          retention-days: 30

@@ -15,6 +15,8 @@ export const apiListAdmins  = () => api.get('/admin/admins').then(r => r.data);
 export const apiCreateAdmin = (data) => api.post('/admin/admins', data).then(r => r.data);
 export const apiDeleteAdmin = (username) => api.delete(`/admin/admins/${username}`).then(r => r.data);
 export const apiSetAdminRole = (username, role) => api.put(`/admin/admins/${username}/role`, { role }).then(r => r.data);
+export const apiResetAdminPassword = (username, newPassword) =>
+  api.put(`/admin/admins/${username}/password`, newPassword ? { newPassword } : {}).then(r => r.data);
 
 // Admin profile.
 export const apiAdminProfile       = () => api.get('/admin/profile').then(r => r.data);

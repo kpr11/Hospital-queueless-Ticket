@@ -7,13 +7,20 @@ const { ROLES } = require('../config/roles');
 const BCRYPT_ROUNDS = 10;
 
 async function bootstrapAdmin() {
-  const { username, password } = config.bootstrapAdmin;
+  const { username, password, resetOnBoot } = config.bootstrapAdmin;
   const snap = await refs.admin(username).once('value');
   if (snap.exists()) {
+    const patch = {};
     // Ensure the env-configured owner account is always a superadmin.
-    if (snap.val().role !== ROLES.SUPERADMIN) {
-      await refs.admin(username).update({ role: ROLES.SUPERADMIN });
-      console.log(`[auth] Promoted bootstrap admin "${username}" to superadmin.`);
+    if (snap.val().role !== ROLES.SUPERADMIN) patch.role = ROLES.SUPERADMIN;
+    // Break-glass password recovery (ADMIN_RESET_ON_BOOT=true).
+    if (resetOnBoot) {
+      patch.passwordHash = await bcrypt.hash(password, BCRYPT_ROUNDS);
+      console.warn(`[auth] ADMIN_RESET_ON_BOOT is set — password for "${username}" reset to ADMIN_PASSWORD. Turn this off and redeploy.`);
+    }
+    if (Object.keys(patch).length > 0) {
+      await refs.admin(username).update(patch);
+      if (patch.role) console.log(`[auth] Promoted bootstrap admin "${username}" to superadmin.`);
     } else {
       console.log(`[auth] Admin "${username}" already exists - skipping bootstrap.`);
     }
@@ -72,6 +79,28 @@ async function changePassword(username, currentPassword, newPassword) {
   await refs.admin(username).update({ passwordHash });
 }
 
+/**
+ * Superadmin-forced password reset for another admin account — no knowledge of
+ * the current password. If `newPassword` is omitted, a strong one is generated
+ * and returned once (the caller must relay it out-of-band).
+ */
+async function resetPassword(targetUsername, newPassword = null) {
+  const snap = await refs.admin(targetUsername).once('value');
+  if (!snap.exists()) throw Object.assign(new Error('Account not found.'), { statusCode: 404 });
+
+  let generated = null;
+  let pw = newPassword;
+  if (!pw) {
+    generated = require('crypto').randomBytes(9).toString('base64url'); // ~12 chars
+    pw = generated;
+  }
+  if (pw.length < 8) throw Object.assign(new Error('New password must be at least 8 characters.'), { statusCode: 400 });
+
+  const passwordHash = await bcrypt.hash(pw, BCRYPT_ROUNDS);
+  await refs.admin(targetUsername).update({ passwordHash, passwordResetAt: Date.now() });
+  return { username: targetUsername, generatedPassword: generated };
+}
+
 async function getAdminProfile(username) {
   const snap = await refs.admin(username).once('value');
   const a = snap.val();
@@ -90,4 +119,4 @@ function verifyToken(token) {
   return jwt.verify(token, config.jwt.secret);
 }
 
-module.exports = { bootstrapAdmin, login, verifyToken, changePassword, getAdminProfile, updateAdminProfile };
+module.exports = { bootstrapAdmin, login, verifyToken, changePassword, resetPassword, getAdminProfile, updateAdminProfile };

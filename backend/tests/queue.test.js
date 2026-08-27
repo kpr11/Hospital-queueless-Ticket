@@ -805,6 +805,35 @@ describe('RBAC (roles & permissions)', () => {
       .send({ username: 'bad', password: 'whatever1', role: 'wizard' });
     expect(res.status).toBe(400);
   });
+
+  test('a superadmin resets another admin password; the target can then log in', async () => {
+    await request(app).post('/api/v1/admin/admins').set('Authorization', `Bearer ${superToken}`)
+      .send({ username: 'lockedout', password: 'originalpass1', role: 'admin' });
+
+    const reset = await request(app).put('/api/v1/admin/admins/lockedout/password')
+      .set('Authorization', `Bearer ${superToken}`).send({});
+    expect(reset.status).toBe(200);
+    expect(reset.body.generatedPassword).toEqual(expect.any(String));
+
+    const oldLogin = await request(app).post('/api/v1/auth/login').send({ username: 'lockedout', password: 'originalpass1' });
+    expect(oldLogin.status).toBe(401);
+    const newLogin = await request(app).post('/api/v1/auth/login').send({ username: 'lockedout', password: reset.body.generatedPassword });
+    expect(newLogin.status).toBe(200);
+  });
+
+  test('a manager cannot reset an admin password', async () => {
+    const res = await request(app).put('/api/v1/admin/admins/lockedout/password')
+      .set('Authorization', `Bearer ${managerToken}`).send({ newPassword: 'hijacked1' });
+    expect(res.status).toBe(403);
+  });
+});
+
+describe('Client error beacon', () => {
+  test('POST /api/v1/client-error accepts a report and returns 204', async () => {
+    const res = await request(app).post('/api/v1/client-error')
+      .send({ message: 'TypeError: x is undefined', stack: 'at Foo (bundle.js:1:1)', url: '/take' });
+    expect(res.status).toBe(204);
+  });
 });
 
 describe('Notification center', () => {

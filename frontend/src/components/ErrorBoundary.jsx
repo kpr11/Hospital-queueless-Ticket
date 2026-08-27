@@ -1,4 +1,5 @@
 import { Component } from 'react';
+import { reportClientError } from '../services/reportClientError.js';
 
 /**
  * Catches render-time errors in any screen and shows a recoverable fallback
@@ -17,6 +18,7 @@ export default class ErrorBoundary extends Component {
 
   componentDidCatch(error, info) {
     console.error('[ui] screen error:', error, info?.componentStack);
+    reportClientError({ message: error?.message || 'render error', stack: error?.stack, componentStack: info?.componentStack });
   }
 
   render() {

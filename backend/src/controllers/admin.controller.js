@@ -416,6 +416,26 @@ async function deleteAdmin(req, res) {
   res.json({ message: `Admin "${username}" deleted.` });
 }
 
+// Superadmin resets another admin's password (no current password needed).
+async function resetAdminPassword(req, res) {
+  const { username } = req.params;
+  if (username === req.user.sub) {
+    throw Object.assign(new Error('Use "change password" for your own account.'), { statusCode: 400 });
+  }
+  const newPassword = (req.body && req.body.newPassword) || null;
+  if (newPassword && String(newPassword).length < 8) {
+    throw Object.assign(new Error('New password must be at least 8 characters.'), { statusCode: 400 });
+  }
+  const result = await authService.resetPassword(username, newPassword);
+  auditService.record({ actor: req.user.sub, action: 'admin.password_reset', target: username });
+  res.json({
+    message: `Password for "${username}" reset.`,
+    ...(result.generatedPassword
+      ? { generatedPassword: result.generatedPassword, note: 'Shown once — relay it to the account owner now.' }
+      : {}),
+  });
+}
+
 async function setAdminRole(req, res) {
   const { username } = req.params;
   const { role } = req.body || {};
@@ -448,7 +468,7 @@ module.exports = {
   setTokenNote,
   listAppointments, cancelAppointment, confirmAppointment,
   pauseService, resumeService,
-  listAdmins, createAdmin, deleteAdmin, setAdminRole,
+  listAdmins, createAdmin, deleteAdmin, setAdminRole, resetAdminPassword,
   queueStaff, queueAnalytics,
   listQueues, queuesOverview, getQueue, createQueue, updateQueue,
   setQueueEnabled, archiveQueue, deleteQueue, reorderQueues, seedQueueDefaults,

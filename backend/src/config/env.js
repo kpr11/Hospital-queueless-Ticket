@@ -11,6 +11,14 @@ const envSchema = Joi.object({
 
   ADMIN_USERNAME: Joi.string().required(),
   ADMIN_PASSWORD: Joi.string().min(8).required(),
+  // Break-glass: when true, the bootstrap admin's password is reset to
+  // ADMIN_PASSWORD on every boot (even if the account already exists). Use it
+  // to recover a locked-out account, then set it back to false and redeploy.
+  ADMIN_RESET_ON_BOOT: Joi.boolean().truthy('true').falsy('false').default(false),
+
+  // Optional: POST 5xx errors as JSON to this URL (Slack/Discord webhook, a
+  // log collector, or a Sentry proxy). Left blank = console logging only.
+  ERROR_WEBHOOK_URL: Joi.string().uri().allow('').optional(),
 
   FIREBASE_PROJECT_ID: Joi.string().required(),
   FIREBASE_CLIENT_EMAIL: Joi.string().email().required(),
@@ -82,7 +90,10 @@ module.exports = {
   bootstrapAdmin: {
     username: env.ADMIN_USERNAME,
     password: env.ADMIN_PASSWORD,
+    resetOnBoot: env.ADMIN_RESET_ON_BOOT,
   },
+
+  errorWebhookUrl: env.ERROR_WEBHOOK_URL || null,
 
   firebase: {
     projectId: env.FIREBASE_PROJECT_ID,

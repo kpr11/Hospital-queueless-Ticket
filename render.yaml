@@ -48,9 +48,13 @@ services:
       - key: FIREBASE_DATABASE_URL
         sync: false
       - key: CORS_ORIGIN
-        sync: false          # your deployed frontend origin, e.g. https://hospital-queueless-dev.web.app
+        sync: false          # your deployed frontend origin, e.g. https://<project-id>.web.app
       - key: FRONTEND_URL
         sync: false          # same as CORS_ORIGIN
+      - key: ERROR_WEBHOOK_URL
+        sync: false          # optional — Slack/Discord webhook for 5xx + client errors
+      - key: ADMIN_RESET_ON_BOOT
+        value: false         # flip to true + redeploy once to recover a locked-out admin
       # Only needed if ANALYTICS_SINK=mongo:
       # - key: MONGO_URI
       #   sync: false

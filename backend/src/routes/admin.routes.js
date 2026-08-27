@@ -62,7 +62,8 @@ router.delete('/queues/:id',            asyncHandler(controller.deleteQueue));
 
 router.get('/admins',                   asyncHandler(controller.listAdmins));
 router.post('/admins',                  requireRole('admin'),      asyncHandler(controller.createAdmin));
-router.put('/admins/:username/role',    requireRole('superadmin'), asyncHandler(controller.setAdminRole));
-router.delete('/admins/:username',      requireRole('admin'),      asyncHandler(controller.deleteAdmin));
+router.put('/admins/:username/role',     requireRole('superadmin'), asyncHandler(controller.setAdminRole));
+router.put('/admins/:username/password', requireRole('superadmin'), asyncHandler(controller.resetAdminPassword));
+router.delete('/admins/:username',       requireRole('admin'),      asyncHandler(controller.deleteAdmin));
 
 module.exports = router;

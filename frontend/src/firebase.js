@@ -7,7 +7,6 @@
  */
 import { initializeApp } from 'firebase/app';
 import { getDatabase, ref, onValue, off, set, onDisconnect } from 'firebase/database';
-import { getAnalytics, isSupported as analyticsIsSupported } from "firebase/analytics";
 
 const firebaseConfig = {
   apiKey:            import.meta.env.VITE_FIREBASE_API_KEY,
@@ -23,16 +22,15 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 
-// Analytics is browser-only and requires a valid measurementId. Initialize it
-// lazily and defensively so a missing config value or unsupported environment
-// (SSR, some browsers) never throws and breaks the app shell.
-let analytics = null;
-if (firebaseConfig.measurementId) {
-  analyticsIsSupported()
-    .then((supported) => {
-      if (supported) analytics = getAnalytics(app);
-    })
-    .catch(() => { /* analytics unavailable - non-fatal */ });
+// Analytics is optional and heavy — load its SDK chunk only in the browser and
+// only when a measurementId is configured, well after first paint.
+if (firebaseConfig.measurementId && typeof window !== 'undefined') {
+  setTimeout(() => {
+    import('firebase/analytics')
+      .then(({ getAnalytics, isSupported }) =>
+        isSupported().then((ok) => { if (ok) getAnalytics(app); }))
+      .catch(() => { /* analytics unavailable — non-fatal */ });
+  }, 3000);
 }
 
-export { db, ref, onValue, off, set, onDisconnect, app, analytics };
+export { db, ref, onValue, off, set, onDisconnect, app };

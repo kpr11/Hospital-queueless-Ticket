@@ -114,12 +114,43 @@ and redeploy the backend.
 
 | Secret | Used by | Needed for |
 |---|---|---|
-| `FIREBASE_SERVICE_ACCOUNT` | `firebase-rules.yml`, `frontend-ci.yml` | auto-deploy DB rules + Hosting |
+| `FIREBASE_SERVICE_ACCOUNT` | `firebase-rules.yml`, `frontend-ci.yml`, `backup.yml` | auto-deploy DB rules + Hosting, nightly backup |
+| `FIREBASE_DATABASE_URL` | `backup.yml` | the RTDB URL (not in the service account JSON) |
 | `FIREBASE_HOSTING_ENV` | `frontend-ci.yml` | build the frontend with real env in CI |
 | `RENDER_DEPLOY_HOOK` | `backend-ci.yml` | auto-redeploy the backend |
+| `SMOKE_BASE_URL`, `SMOKE_ADMIN_USER`, `SMOKE_ADMIN_PASS` | `backend-ci.yml` | post-deploy read-only smoke test |
 
-Every deploy job **skips cleanly** if its secret is missing — CI (lint + test +
-build) still gates merges.
+Every deploy/backup/smoke job **skips cleanly** if its secret is missing — CI
+(lint + test + build) still gates merges.
+
+---
+
+## Operations scripts
+
+Run from the repo root (they use `backend/serviceAccount.json`).
+
+| Command | What |
+|---|---|
+| `node firebase/deploy-rules.js` | deploy `database.rules.json` to the live RTDB (`--open` reverts to test-mode) |
+| `node firebase/verify-rules.js` | check the deployed rules allow queue reads and deny `hospital/*` / `admins` / `counter` |
+| `node firebase/backup.js [outDir]` | full RTDB export → timestamped JSON (keeps newest 14 locally) |
+| `cd backend && npm run smoke` | end-to-end HTTP test against a running backend (`BASE_URL`, `ADMIN_PASS` env; `--readonly` for a no-write check) |
+| `cd backend && npm run loadtest` | read-path load generator (`DURATION`, `CONCURRENCY` env); reports throughput + latency percentiles |
+
+## Monitoring
+
+Set `ERROR_WEBHOOK_URL` on the backend to a Slack/Discord incoming webhook (or a
+log collector). Backend 5xx errors, unhandled rejections, and browser errors
+(via the `ErrorBoundary` + global handlers → `POST /api/v1/client-error`) are
+forwarded there as JSON. Swap `backend/src/utils/reportError.js` for
+`Sentry.captureException` if you'd rather use Sentry.
+
+## Locked out of admin?
+
+Set `ADMIN_RESET_ON_BOOT=true` on the backend and redeploy — the bootstrap
+admin's password resets to `ADMIN_PASSWORD` on the next boot. Log in, then set
+the flag back to `false` and redeploy. Or, from another superadmin account:
+**Admin accounts → Reset password**.
 
 ---
 
@@ -138,9 +169,10 @@ build) still gates merges.
 
 ## Still open (before a real hospital pilot)
 
-- Error monitoring (Sentry) + uptime alerts
-- Admin password-reset flow
-- Real integration tests (suite currently mocks Firebase)
-- RTDB backup schedule
-- Load testing the reception + display path
-- Triage the open Dependabot PRs
+- Uptime alerts (the error webhook covers exceptions, not "is it up")
+- Hermetic integration tests against the Firebase emulator (the HTTP `smoke`
+  script covers the critical path against a real backend today)
+- Migrate the major dependency bumps: express 4→5, jest 29→30, tailwind 3→4,
+  bcryptjs 2→3, eslint 9→10 (each is a breaking change — do them one at a time)
+- Chart `patient_registered` / `patient_verified` in AdminAnalytics + the
+  Python pipeline (live counts are on the reception page today)

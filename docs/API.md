@@ -25,6 +25,7 @@ Auth tiers: **public** · **staff** (staff or any admin tier) ·
 | POST | `/tokens/:id/requeue` | public | Re-issue an expired token (≤ 2 h) |
 | POST | `/appointments` | public | Book appointment `{name, service, date, timeSlot}` |
 | POST | `/feedback` | public | Rate a served token `{tokenId, rating, comment?}` |
+| POST | `/client-error` | public (rate-limited 20/min) | Browser error beacon `{message, stack?, url?}` → logged + optional webhook |
 
 ## Hospital patients (Medical industry)
 
@@ -114,6 +115,7 @@ Stale `registered` records are auto-marked `expired` after
 | GET | `/admin/admins` | admin | List admin accounts |
 | POST | `/admin/admins` | admin+ | Create `{username, password, displayName?, role: admin\|manager}` |
 | PUT | `/admin/admins/:username/role` | superadmin | Change role |
+| PUT | `/admin/admins/:username/password` | superadmin | Force-reset another admin's password (`{newPassword?}`; a strong one is generated and returned once if omitted) |
 | DELETE | `/admin/admins/:username` | admin+ | Delete (superadmin protected) |
 | GET/PUT | `/admin/profile` · POST `/admin/change-password` | admin | Own account |
 | GET/PUT | `/admin/config` | admin | Org settings |

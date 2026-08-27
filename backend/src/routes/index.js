@@ -1,7 +1,9 @@
 const router = require('express').Router();
 const crypto = require('crypto');
+const rateLimit = require('express-rate-limit');
 const asyncHandler = require('../utils/asyncHandler');
 const { refs } = require('../config/firebase');
+const { reportError } = require('../utils/reportError');
 
 router.use('/auth',     require('./auth.routes'));
 router.use('/tokens',   require('./token.routes'));
@@ -14,6 +16,22 @@ router.use(require('./share.routes'));     // /shares (auth), /share/:id (public
 router.use(require('./upload.routes'));    // /uploads (auth) — RTDB-backed shared files
 
 router.post('/feedback', asyncHandler(require('../controllers/feedback.controller').submitFeedback));
+
+// Public: browser error beacon (global handler + ErrorBoundary post here).
+const clientErrorLimiter = rateLimit({
+  windowMs: 60 * 1000, max: 20, standardHeaders: true, legacyHeaders: false,
+  skip: () => process.env.NODE_ENV === 'test',
+});
+router.post('/client-error', clientErrorLimiter, (req, res) => {
+  const { message, stack, url, componentStack } = req.body || {};
+  reportError({
+    source: 'frontend',
+    message: String(message || 'client error').slice(0, 500),
+    stack: [stack, componentStack].filter(Boolean).join('\n---\n'),
+    context: { url: String(url || '').slice(0, 300), ua: String(req.get('user-agent') || '').slice(0, 200) },
+  });
+  res.status(204).end();
+});
 
 router.get('/config', asyncHandler(async (req, res) => {
   const queueAdminService = require('../services/queueAdmin.service');
