@@ -8,26 +8,22 @@
 ### A cloud-native smart token & queue management system
 
 ![Version](https://img.shields.io/badge/version-1.6.0-blue)
-[![Container](https://img.shields.io/badge/GHCR-v1.6.0-2496ED?logo=docker&logoColor=white)](https://github.com/users/SufiyanAasim/packages/container/package/queueless)
-![Release](https://img.shields.io/badge/release-Cosmos%20%E2%80%94%20LAN%20Connectivity%20%26%20UI%20Polish-8A2BE2)
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![Frontend](https://img.shields.io/badge/frontend-React%2019%20%2B%20Vite-61DAFB)
 ![Backend](https://img.shields.io/badge/backend-Node%2020%20%2B%20Express-339933)
 ![Realtime](https://img.shields.io/badge/realtime-Firebase%20RTDB-FFCA28)
-![Tests](https://img.shields.io/badge/backend%20tests-48%20passing-brightgreen)
-![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen)
+![Tests](https://img.shields.io/badge/backend%20tests-65%20passing-brightgreen)
 
 Replaces paper tokens with a real-time browser experience — customers take a
 token from any device, track their live position, and get notified the moment
 their number is called. No app download, no accounts for customers.
 
-[Live Demo](https://queueless-beta.vercel.app) · [Changelog](CHANGELOG.md) · [Roadmap](ROADMAP.md) · [Report a Bug](https://github.com/SufiyanAasim/queueless/issues/new/choose)
+[Changelog](CHANGELOG.md) · [Roadmap](ROADMAP.md) · [Report a Bug](https://github.com/kpr11/Hospital-queueless-Ticket/issues/new/choose)
 
 </div>
 
 ---
 
-**Author:** Mohammad Sufiyan Aasim · [@SufiyanAasim](https://github.com/SufiyanAasim)<br>
 **Latest release:** v1.6.0 — Cosmos _(LAN Connectivity & UI Polish)_
 
 **Docs:** [Architecture](docs/Architecture.md) · [API](docs/API.md) · [Deployment](docs/Deployment.md) · [Development](docs/Development.md) · [Guides](docs/AdminGuide.md) · [Troubleshooting](docs/Troubleshooting.md) · [Release notes](docs/releases)  
@@ -566,7 +562,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) to get involved.
 
 ## 📄 License
 
-MIT License © 2026 Mohammad Sufiyan Aasim ([@SufiyanAasim](https://github.com/SufiyanAasim)) — see [LICENSE](LICENSE).
+MIT License © 2026 Mohammad Sufiyan Aasim ([@SufiyanAasim](https://github.com/SufiyanAasim)) and Rajesh K P ([@kpr11](https://github.com/kpr11)) — see [LICENSE](LICENSE).
 
 ---
 
@@ -574,6 +570,6 @@ MIT License © 2026 Mohammad Sufiyan Aasim ([@SufiyanAasim](https://github.com/S
 
 ⭐ **Star this repo if QueueLess saved you a queue.**
 
-[Report Bug](https://github.com/SufiyanAasim/queueless/issues/new/choose) · [Request Feature](https://github.com/SufiyanAasim/queueless/issues/new/choose)
+[Report Bug](https://github.com/kpr11/Hospital-queueless-Ticket/issues/new/choose) · [Request Feature](https://github.com/kpr11/Hospital-queueless-Ticket/issues/new/choose)
 
 </div>
