@@ -1,7 +1,9 @@
-# Deploying QueueLess to production
+# Deploying to production
 
-This is the hospital / Aadhaar-registration build. Read the **Blockers** section
-before you expose anything publicly.
+Hospital / Aadhaar-registration build. Read **Blockers** before exposing anything publicly.
+
+Replace `<PROJECT_ID>` below with your Firebase project id, and
+`<BACKEND_URL>` / `<FRONTEND_URL>` with the deployed URLs.
 
 ---
 
@@ -9,85 +11,115 @@ before you expose anything publicly.
 
 | Piece | Runs on | Notes |
 |---|---|---|
-| Realtime Database | Firebase project (your `hospital-queueless-dev`, or a fresh prod project) | Free Spark plan is enough. |
-| Frontend (`frontend/`) | Firebase Hosting **or** Vercel / Netlify | Static build (`npm run build` → `dist/`). |
-| Backend (`backend/`) | Render / Railway / Fly.io **or** Google Cloud Run | Cannot run on Firebase's free plan. `render.yaml` is pre-wired for Render. |
-| Analytics (`analytics/`) | Run on demand (cron / manual) | Not a server. |
+| Realtime Database | Firebase project (Spark / free plan) | operational store + patient registry |
+| Frontend (`frontend/`) | Firebase Hosting (free) or Vercel / Netlify | static build → `dist/` |
+| Backend (`backend/`) | Render / Railway / Fly.io / Cloud Run | cannot run on Firebase's free plan; `render.yaml` is pre-wired for Render |
+| Analytics (`analytics/`) | on demand (cron / manual) | not a server |
 
-Your laptop is only needed to *deploy*. Once deployed, everything runs 24/7 without it.
-
----
-
-## 🔴 Blockers — do these before any public deploy
-
-1. **Lock down Firebase rules.** The database is currently in test mode
-   (`{".read": true, ".write": true}`) — anyone on the internet can read/write
-   everything. Deploy the hardened rules:
-   ```bash
-   npm i -g firebase-tools
-   cd firebase
-   firebase login
-   firebase use <your-project-id>
-   firebase deploy --only database
-   ```
-   `database.rules.json` already denies all client access to `hospital/*`
-   (patient PII) — it is served only through the authenticated API.
-
-2. **Rotate every secret.** In the deployed backend env, set fresh values for:
-   `JWT_SECRET` (64-byte hex), `ADMIN_PASSWORD` (strong), `AADHAAR_SALT`
-   (32-byte hex, dedicated — not the JWT secret). Never reuse the dev `.env`.
-   ```bash
-   node -e "console.log(require('crypto').randomBytes(64).toString('hex'))" # JWT_SECRET
-   node -e "console.log(require('crypto').randomBytes(32).toString('hex'))" # AADHAAR_SALT
-   ```
-   Changing `AADHAAR_SALT` invalidates the hash of every existing patient
-   record — only set it once, before go-live.
-
-3. **Get the code into your own Git repo.** `origin` currently points at
-   `SufiyanAasim/queueless` (upstream). Create your own repo and push there;
-   Render/Vercel deploy from a repo you control.
-
-4. **Legal review for Aadhaar handling.** Storing even a hash + last 4 digits of
-   an Aadhaar number in India is governed by the Aadhaar Act / UIDAI rules. Get
-   the consent wording reviewed and a data-retention policy in place, or switch
-   identity verification to a hospital-issued patient ID (MRN). This is not a
-   code task and should not be skipped for a real hospital.
+Once deployed, everything runs 24/7 — your laptop is only needed to push code.
 
 ---
 
-## Backend → Render (free tier or $7/mo)
+## 🔴 Blockers — before any public deploy
 
-1. Push your repo to GitHub.
-2. Render dashboard → **New → Blueprint** → point at your repo. `render.yaml` is
-   detected; it builds `backend/` with `npm ci` and starts `node src/server.js`.
-3. Set the secret env vars (marked `sync: false` in `render.yaml`) in the Render
-   dashboard: `JWT_SECRET`, `ADMIN_USERNAME`, `ADMIN_PASSWORD`,
-   `AADHAAR_SALT`, `FIREBASE_PROJECT_ID`, `FIREBASE_CLIENT_EMAIL`,
-   `FIREBASE_PRIVATE_KEY` (keep the `\n` escapes, wrap in quotes),
-   `FIREBASE_DATABASE_URL`, `CORS_ORIGIN` (your frontend URL),
-   `FRONTEND_URL`, and `MONGO_URI` only if you set `ANALYTICS_SINK=mongo`.
-4. Deploy. Health check: `https://<your-backend>.onrender.com/api/v1/health`.
+### 1. Lock down the Firebase database rules
 
-> Free tier sleeps after 15 min idle (~50 s cold start on the next request).
-> A real reception desk should use the $7/mo always-on instance.
+The DB starts in **test mode** (`{".read": true, ".write": true}`) — the whole
+database is world read/write. Deploy the hardened `firebase/database.rules.json`:
 
-## Frontend → Firebase Hosting (free)
+```bash
+npm i -g firebase-tools
+cd firebase && firebase login && firebase deploy --only database
+```
+
+or, without an interactive login, using the service-account JSON:
+
+```bash
+GOOGLE_APPLICATION_CREDENTIALS=../backend/serviceAccount.json \
+  npx firebase-tools deploy --only database --project <PROJECT_ID> --non-interactive
+```
+
+`database.rules.json` denies **all** client access to `hospital/*` (patient PII);
+clients can only read `queue/state`, `queue/tokens`, `queue/announcement`,
+`presence`, and the signal nodes — everything else goes through the JWT API.
+
+### 2. Rotate every secret
+
+Fresh values in the **deployed backend env** — never reuse the dev `.env`:
+
+```bash
+node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"  # JWT_SECRET
+node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"  # AADHAAR_SALT
+```
+
+Also set a strong `ADMIN_PASSWORD` and change it again in-app after first login.
+`AADHAAR_SALT` invalidates every stored patient-record hash when changed — set it
+once, before go-live.
+
+### 3. Legal review for Aadhaar handling
+
+Storing even a hash + last 4 digits of an Aadhaar number in India is governed by
+the Aadhaar Act / UIDAI rules. Get the consent wording reviewed and a
+data-retention policy in place, or switch identity verification to a
+hospital-issued patient ID (MRN). **Not a code task; don't skip it.**
+
+---
+
+## Backend → Render
+
+1. Render dashboard → **New → Blueprint** → select your GitHub repo. `render.yaml`
+   is auto-detected (builds `backend/` with `npm ci`, starts `node src/server.js`,
+   health check `/api/v1/health`).
+2. In the service's **Environment** tab set every `sync: false` var from
+   `render.yaml`: `JWT_SECRET`, `AADHAAR_SALT`, `ADMIN_USERNAME`, `ADMIN_PASSWORD`,
+   `FIREBASE_PROJECT_ID`, `FIREBASE_CLIENT_EMAIL`, `FIREBASE_PRIVATE_KEY`
+   (paste with the literal `\n`, wrapped in quotes), `FIREBASE_DATABASE_URL`,
+   `CORS_ORIGIN` = `<FRONTEND_URL>`, `FRONTEND_URL` = `<FRONTEND_URL>`.
+3. Deploy. Verify: `curl https://<BACKEND_URL>/api/v1/health` → `{"status":"ok"}`.
+4. Settings → **Deploy Hook** → copy the URL → add it as the GitHub repo secret
+   `RENDER_DEPLOY_HOOK` so `backend-ci.yml` redeploys on every green push.
+
+> Free tier sleeps after 15 min idle (~50 s cold start). A real reception desk
+> wants the always-on instance.
+
+## Frontend → Firebase Hosting
+
+`firebase/firebase.json` already has the hosting config (`../frontend/dist`, SPA
+rewrite). Manual deploy:
 
 ```bash
 cd frontend
-# set the production API URL + Firebase web config in .env.production
-#   VITE_API_BASE_URL=https://<your-backend>.onrender.com/api/v1
-#   VITE_FIREBASE_* = your web app config
+cp .env.example .env.production   # set VITE_API_BASE_URL=https://<BACKEND_URL>/api/v1  + the VITE_FIREBASE_* web config
 npm run build
-
-cd ..
-npm i -g firebase-tools   # if not already
-firebase init hosting     # public dir: frontend/dist, SPA rewrite: yes
-firebase deploy --only hosting
+cd ../firebase
+firebase deploy --only hosting --project <PROJECT_ID>
 ```
 
-Then set `CORS_ORIGIN` and `FRONTEND_URL` on the backend to the Hosting URL and
-redeploy the backend.
+Or let CI do it — add two repo secrets and every push to `main` deploys:
+
+| Secret | Value |
+|---|---|
+| `FIREBASE_SERVICE_ACCOUNT` | full contents of `backend/serviceAccount.json` |
+| `FIREBASE_HOSTING_ENV` | the production `VITE_*` lines, one `KEY=VALUE` per line |
+
+(Prefer Vercel? Connect the repo in the Vercel dashboard and delete the `deploy`
+job in `.github/workflows/frontend-ci.yml`.)
+
+After the frontend URL exists, set `CORS_ORIGIN` + `FRONTEND_URL` on Render to it
+and redeploy the backend.
+
+---
+
+## GitHub repo secrets (Settings → Secrets and variables → Actions)
+
+| Secret | Used by | Needed for |
+|---|---|---|
+| `FIREBASE_SERVICE_ACCOUNT` | `firebase-rules.yml`, `frontend-ci.yml` | auto-deploy DB rules + Hosting |
+| `FIREBASE_HOSTING_ENV` | `frontend-ci.yml` | build the frontend with real env in CI |
+| `RENDER_DEPLOY_HOOK` | `backend-ci.yml` | auto-redeploy the backend |
+
+Every deploy job **skips cleanly** if its secret is missing — CI (lint + test +
+build) still gates merges.
 
 ---
 
@@ -95,21 +127,20 @@ redeploy the backend.
 
 - [ ] `firebase deploy --only database` ran; test-mode rules replaced
 - [ ] All secrets rotated; dev `.env` not reused
-- [ ] `curl https://<backend>/api/v1/health` → `{"status":"ok"}`
+- [ ] `curl https://<BACKEND_URL>/api/v1/health` → `{"status":"ok"}`
 - [ ] Admin login works; **admin password changed from the bootstrap value**
-- [ ] `CORS_ORIGIN` on the backend matches the deployed frontend origin exactly
-- [ ] Industry set to Medical → `/admin/queues` shows all departments
-      (use "+ Medical / Hospital defaults" if not)
-- [ ] `/register` → reception desk verify → token issued → shows on `/display`
+- [ ] `CORS_ORIGIN` on the backend exactly matches the frontend origin
+- [ ] Industry = Medical → `/admin/queues` shows all departments
+- [ ] `/register` → reception verify → token issued → shows on `/display`
 - [ ] Public `/register` rate limit works (6th submit in a minute → 429)
-- [ ] HTTPS everywhere; custom domain (optional) configured
+- [ ] HTTPS everywhere; custom domain (optional)
 - [ ] Consent wording reviewed; retention policy documented
 
-## Still open (not blockers, but before a real hospital pilot)
+## Still open (before a real hospital pilot)
 
-- Error monitoring (Sentry) + uptime alerts — needs an account + DSN
-- CI running `npm test` + `npm run lint` on every push — needs the repo
+- Error monitoring (Sentry) + uptime alerts
 - Admin password-reset flow
-- Real integration tests (current suite mocks Firebase)
+- Real integration tests (suite currently mocks Firebase)
 - RTDB backup schedule
 - Load testing the reception + display path
+- Triage the open Dependabot PRs

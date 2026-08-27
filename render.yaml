@@ -1,11 +1,12 @@
 services:
   - type: web
-    name: queueless-backend
+    name: hospital-queueless-backend
     runtime: node
     rootDir: backend
     buildCommand: npm ci
     startCommand: node src/server.js
     plan: free
+    healthCheckPath: /api/v1/health
     envVars:
       - key: NODE_ENV
         value: production
@@ -17,21 +18,23 @@ services:
         value: 180
       - key: TOKEN_EXPIRY_SECONDS
         value: 3600
+      - key: PATIENT_REGISTRATION_TTL_HOURS
+        value: 12
+      # CSV analytics writes to Render's ephemeral disk (fine for a pilot).
+      # Switch to "mongo" and set MONGO_URI for a persistent event log.
       - key: ANALYTICS_SINK
-        value: mongo
+        value: csv
       - key: ANALYTICS_CSV_PATH
         value: ../analytics/data/queue_events.csv
-      - key: MONGO_DB
-        value: queueless
-      - key: MONGO_COLLECTION
-        value: queue_events
       - key: SMTP_PORT
         value: 587
       - key: SMTP_FROM
-        value: noreply@queueless.app
-      # --- secrets: set these manually in Render dashboard ---
+        value: noreply@example.com
+      # --- secrets: set these in the Render dashboard (Environment tab) ---
       - key: JWT_SECRET
-        sync: false
+        sync: false          # node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"
+      - key: AADHAAR_SALT
+        sync: false          # node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
       - key: ADMIN_USERNAME
         sync: false
       - key: ADMIN_PASSWORD
@@ -41,12 +44,13 @@ services:
       - key: FIREBASE_CLIENT_EMAIL
         sync: false
       - key: FIREBASE_PRIVATE_KEY
-        sync: false
+        sync: false          # paste with the literal \n escapes, wrapped in quotes
       - key: FIREBASE_DATABASE_URL
         sync: false
-      - key: MONGO_URI
-        sync: false
       - key: CORS_ORIGIN
-        sync: false
+        sync: false          # your deployed frontend origin, e.g. https://hospital-queueless-dev.web.app
       - key: FRONTEND_URL
-        sync: false
+        sync: false          # same as CORS_ORIGIN
+      # Only needed if ANALYTICS_SINK=mongo:
+      # - key: MONGO_URI
+      #   sync: false

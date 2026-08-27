@@ -39,7 +39,7 @@ jobs:
         id: metadata
         uses: docker/metadata-action@v6
         with:
-          images: ghcr.io/sufiyanaasim/queueless
+          images: ghcr.io/${{ github.repository_owner }}/hospital-queueless-ticket
           tags: |
             type=raw,value=${{ steps.package.outputs.version }}
             type=raw,value=latest

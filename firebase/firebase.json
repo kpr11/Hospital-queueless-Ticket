@@ -1,7 +1,20 @@
 {
-  "_comment": "QueueLess Firebase project configuration. Run `firebase deploy` from this directory to push rules + cloud functions.",
+  "_comment": "QueueLess Firebase config. From this directory: `firebase deploy --only database` (rules), `firebase deploy --only hosting` (frontend — build frontend/ first), `firebase deploy --only functions` (optional).",
   "database": {
     "rules": "database.rules.json"
+  },
+  "hosting": {
+    "public": "../frontend/dist",
+    "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
+    "rewrites": [
+      { "source": "**", "destination": "/index.html" }
+    ],
+    "headers": [
+      {
+        "source": "/assets/**",
+        "headers": [{ "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }]
+      }
+    ]
   },
   "functions": [
     {

@@ -44,6 +44,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Lint
+        run: npm run lint
+
       - name: Run tests
         run: npm test
         env:
@@ -74,10 +77,9 @@ jobs:
           RENDER_DEPLOY_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK }}
         run: |
           if [ -z "$RENDER_DEPLOY_HOOK" ]; then
-            echo "RENDER_DEPLOY_HOOK secret not configured."
-            exit 1
+            echo "::notice::RENDER_DEPLOY_HOOK secret not set — skipping deploy."
+            echo "Add it under Settings → Secrets → Actions once the Render service exists."
+            exit 0
           fi
-
-          curl -X POST "$RENDER_DEPLOY_HOOK"
-
-          echo "Render deployment triggered successfully."
+          curl -fsS -X POST "$RENDER_DEPLOY_HOOK"
+          echo "Render deployment triggered."

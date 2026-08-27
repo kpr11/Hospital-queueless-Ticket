@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - 'firebase/database.rules.json'
+  workflow_dispatch: {}
 
 jobs:
   deploy:
@@ -12,14 +13,22 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Firebase Tools
-        run: npm install -g firebase-tools
-
-      - name: Deploy Database Rules
-        run: |
-          echo "$FIREBASE_SERVICE_ACCOUNT" > service-account.json
-          export GOOGLE_APPLICATION_CREDENTIALS=service-account.json
-          firebase deploy --only database --project queueless-tqms-pk
-        working-directory: ./firebase
+      - name: Check for deploy secret
+        id: gate
         env:
-          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          SA: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          if [ -z "$SA" ]; then
+            echo "::notice::FIREBASE_SERVICE_ACCOUNT not set — skipping rules deploy."
+            echo "go=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "go=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Deploy database rules
+        if: steps.gate.outputs.go == 'true'
+        working-directory: firebase
+        run: |
+          printf '%s' '${{ secrets.FIREBASE_SERVICE_ACCOUNT }}' > "$RUNNER_TEMP/sa.json"
+          export GOOGLE_APPLICATION_CREDENTIALS="$RUNNER_TEMP/sa.json"
+          npx --yes firebase-tools@latest deploy --only database --project hospital-queueless-dev --non-interactive
