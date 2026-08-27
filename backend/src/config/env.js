@@ -73,8 +73,22 @@ if (error) {
   process.exit(1);
 }
 
-// Firebase private keys arrive from .env with literal \n sequences — unescape so the SDK reads the PEM.
-const firebasePrivateKey = env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n');
+// Normalise the Firebase private key. Different hosts / paste habits produce
+// different shapes; accept them all:
+//  - surrounding single or double quotes (common when pasting from JSON)
+//  - literal "\n" two-char sequences (dotenv / most dashboards)
+//  - real newlines (Render/Heroku multi-line values) — left as-is
+//  - stray \r from Windows clipboards
+const firebasePrivateKey = env.FIREBASE_PRIVATE_KEY
+  .trim()
+  .replace(/^["']|["']$/g, '')
+  .replace(/\\n/g, '\n')
+  .replace(/\r/g, '');
+
+if (!/-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]+-----END [A-Z ]*PRIVATE KEY-----/.test(firebasePrivateKey)) {
+  console.error('[env] FIREBASE_PRIVATE_KEY does not look like a PEM key. Paste the value of "private_key" from the service-account JSON, keeping the \\n sequences, without the surrounding quotes.');
+  process.exit(1);
+}
 
 module.exports = {
   port: env.PORT,
