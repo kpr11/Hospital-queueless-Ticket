@@ -108,7 +108,7 @@ async function getAppConfig(req, res) {
   res.json(snap.val() || { industry: 'general', orgName: 'QueueLess' });
 }
 
-const VALID_INDUSTRIES = ['general', 'bank', 'medical', 'restaurant'];
+const VALID_INDUSTRIES = ['general', 'medical'];
 const HH_MM_REGEX = /^\d{2}:\d{2}$/;
 
 async function updateAppConfig(req, res) {

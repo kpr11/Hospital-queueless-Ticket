@@ -17,18 +17,6 @@ const INDUSTRY_PROFILES = {
       { id: 'support', title: 'Help & Support', prefix: 'S' },
     ],
   },
-  bank: {
-    name: 'Bank / Finance',
-    services: [
-      { id: 'new_account', title: 'New Account', prefix: 'NA' },
-      { id: 'loan', title: 'Loan Application', prefix: 'L' },
-      { id: 'forex', title: 'Foreign Exchange', prefix: 'FX' },
-      { id: 'card_services', title: 'Card Services', prefix: 'CS' },
-      { id: 'priority_banking', title: 'Priority Banking', prefix: 'PB' },
-      { id: 'locker', title: 'Locker Services', prefix: 'LK' },
-      { id: 'general', title: 'General Banking', prefix: 'GB' },
-    ],
-  },
   medical: {
     name: 'Medical / Hospital',
     services: [
@@ -45,17 +33,6 @@ const INDUSTRY_PROFILES = {
       { id: 'pharmacy', title: 'Pharmacy', prefix: 'PH' },
       { id: 'radiology', title: 'Radiology', prefix: 'RD' },
       { id: 'emergency', title: 'Emergency', prefix: 'ER' },
-    ],
-  },
-  restaurant: {
-    name: 'Restaurant / Dining',
-    services: [
-      { id: 'table_small', title: 'Table (1-2)', prefix: 'TS' },
-      { id: 'table_medium', title: 'Table (3-4)', prefix: 'TM' },
-      { id: 'table_large', title: 'Table (5+)', prefix: 'TL' },
-      { id: 'reservation', title: 'Reservation', prefix: 'RS' },
-      { id: 'takeaway', title: 'Takeaway', prefix: 'TA' },
-      { id: 'bar', title: 'Bar / Lounge', prefix: 'BR' },
     ],
   },
 };

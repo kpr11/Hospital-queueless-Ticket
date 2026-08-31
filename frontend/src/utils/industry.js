@@ -11,18 +11,6 @@ export const INDUSTRY_PROFILES = {
       { id: 'support',      title: 'Help & Support',    desc: 'Complaints, follow-ups, assistance' },
     ],
   },
-  bank: {
-    name: 'Bank / Finance',
-    services: [
-      { id: 'new_account',      title: 'New Account',       desc: 'Open savings, current, or business account' },
-      { id: 'loan',             title: 'Loan Application',  desc: 'Personal, home, or vehicle loan' },
-      { id: 'forex',            title: 'Foreign Exchange',  desc: 'Currency conversion, remittance' },
-      { id: 'card_services',    title: 'Card Services',     desc: 'Debit/credit card issues, PIN reset' },
-      { id: 'priority_banking', title: 'Priority Banking',  desc: 'Premium / wealth customer desk' },
-      { id: 'locker',           title: 'Locker Services',   desc: 'Safe deposit locker access' },
-      { id: 'general',          title: 'General Banking',   desc: 'Deposits, withdrawals, general queries' },
-    ],
-  },
   medical: {
     name: 'Medical / Hospital',
     services: [
@@ -39,17 +27,6 @@ export const INDUSTRY_PROFILES = {
       { id: 'pharmacy',       title: 'Pharmacy',         desc: 'Prescription pickup, medication' },
       { id: 'radiology',      title: 'Radiology',        desc: 'X-Ray, MRI, ultrasound' },
       { id: 'emergency',      title: 'Emergency',        desc: 'Urgent care — auto-priority' },
-    ],
-  },
-  restaurant: {
-    name: 'Restaurant / Dining',
-    services: [
-      { id: 'table_small',  title: 'Table (1-2)',  desc: 'Small table for 1 or 2 people' },
-      { id: 'table_medium', title: 'Table (3-4)',  desc: 'Medium table for 3-4 people' },
-      { id: 'table_large',  title: 'Table (5+)',   desc: 'Large table for 5 or more' },
-      { id: 'reservation',  title: 'Reservation',  desc: 'Booked / reserved seating' },
-      { id: 'takeaway',     title: 'Takeaway',     desc: 'Order pickup, no seating needed' },
-      { id: 'bar',          title: 'Bar / Lounge', desc: 'Bar seating & drinks' },
     ],
   },
 };

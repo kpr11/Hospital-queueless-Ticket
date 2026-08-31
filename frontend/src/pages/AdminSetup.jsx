@@ -4,12 +4,20 @@ import { useAuth } from '../context/AuthContext.jsx';
 import { useAppConfig } from '../hooks/useAppConfig.js';
 import { apiUpdateConfig } from '../services/api.js';
 import { INDUSTRY_PROFILES } from '../utils/industry.js';
+import { INDIA_STATES, INDIA_STATE_NAMES } from '../utils/indiaStates.js';
 
-const CITIES = [
-  'Karachi', 'Lahore', 'Islamabad', 'Rawalpindi', 'Faisalabad', 'Multan', 'Peshawar',
-  'Quetta', 'Hyderabad', 'Gujranwala', 'Sialkot', 'Bahawalpur', 'Sargodha', 'Sukkur',
-  'Abbottabad', 'Mardan', 'Gujrat', 'Larkana', 'Sheikhupura',
-];
+/** Split a stored "District, State" (or "State") location back into its parts. */
+function parseLocation(value) {
+  if (!value) return { stateName: '', district: '', other: '' };
+  if (INDIA_STATES[value]) return { stateName: value, district: '', other: '' };
+  const parts = value.split(',').map(s => s.trim());
+  const maybeState = parts[parts.length - 1];
+  const maybeDistrict = parts.slice(0, -1).join(', ');
+  if (INDIA_STATES[maybeState] && INDIA_STATES[maybeState].includes(maybeDistrict)) {
+    return { stateName: maybeState, district: maybeDistrict, other: '' };
+  }
+  return { stateName: '', district: '', other: value };
+}
 
 export default function AdminSetup() {
   const { user } = useAuth();
@@ -18,11 +26,13 @@ export default function AdminSetup() {
 
   const [industry, setIndustry] = useState('general');
   const [orgName, setOrgName] = useState('');
-  const [location, setLocation] = useState('');
+  const [stateName, setStateName] = useState('');
+  const [district, setDistrict] = useState('');
+  const [otherLocation, setOtherLocation] = useState('');
+  const [useOtherLocation, setUseOtherLocation] = useState(false);
   const [displayMessage, setDisplayMessage] = useState('');
   const [slaMinutes, setSlaMinutes] = useState('');
   const [autoResetTime, setAutoResetTime] = useState('');
-  const [otherCity, setOtherCity] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
 
@@ -31,7 +41,13 @@ export default function AdminSetup() {
     if (!cfg) return;
     if (cfg.industry) setIndustry(cfg.industry);
     if (cfg.orgName && cfg.orgName !== 'QueueLess') setOrgName(cfg.orgName);
-    if (cfg.location) { setLocation(cfg.location); setOtherCity(!CITIES.includes(cfg.location)); }
+    if (cfg.location) {
+      const parsed = parseLocation(cfg.location);
+      setStateName(parsed.stateName);
+      setDistrict(parsed.district);
+      setOtherLocation(parsed.other);
+      setUseOtherLocation(Boolean(parsed.other));
+    }
     if (cfg.displayMessage) setDisplayMessage(cfg.displayMessage);
     if (cfg.slaMinutes) setSlaMinutes(String(cfg.slaMinutes));
     if (cfg.autoResetTime) setAutoResetTime(cfg.autoResetTime);
@@ -44,7 +60,11 @@ export default function AdminSetup() {
     setSaving(true);
     setError(null);
     try {
-      const trimmedLocation = location.trim() || null;
+      let trimmedLocation;
+      if (useOtherLocation) trimmedLocation = otherLocation.trim() || null;
+      else if (stateName && district) trimmedLocation = `${district}, ${stateName}`;
+      else if (stateName) trimmedLocation = stateName;
+      else trimmedLocation = null;
       const trimmedMessage = displayMessage.trim() || null;
       const parsedSla = slaMinutes ? Number(slaMinutes) : null;
       const trimmedReset = autoResetTime || null;
@@ -85,34 +105,46 @@ export default function AdminSetup() {
           type="text"
           value={orgName}
           onChange={e => setOrgName(e.target.value)}
-          placeholder="e.g. Shifa Hospital, Meezan Bank Gulshan Branch"
+          placeholder="e.g. Sri Jayadeva Institute of Cardiovascular Sciences and Research"
           className="w-full sm:max-w-md border border-rule bg-cream px-4 py-3 text-sm focus:outline-none focus:border-ink"
         />
       </div>
 
       <div className="mt-8">
-        <span className="label block mb-1">City / Location</span>
+        <span className="label block mb-1">State &amp; District</span>
         <p className="text-xs text-graphite mb-3">Shown in the status bar and on printed tokens.</p>
-        <div className="flex flex-col sm:flex-row gap-3 sm:max-w-md">
+        <div className="flex flex-col sm:flex-row gap-3 sm:max-w-xl">
           <select
-            value={otherCity ? 'Other' : location}
+            value={useOtherLocation ? 'Other' : stateName}
             onChange={e => {
               const v = e.target.value;
-              if (v === 'Other') { setOtherCity(true); setLocation(''); }
-              else { setOtherCity(false); setLocation(v); }
+              if (v === 'Other') { setUseOtherLocation(true); setStateName(''); setDistrict(''); }
+              else { setUseOtherLocation(false); setStateName(v); setDistrict(''); }
             }}
             className="w-full border border-rule bg-cream px-4 py-3 text-sm focus:outline-none focus:border-ink"
           >
-            <option value="">Select a city…</option>
-            {CITIES.map(c => <option key={c} value={c}>{c}</option>)}
+            <option value="">Select a state…</option>
+            {INDIA_STATE_NAMES.map(s => <option key={s} value={s}>{s}</option>)}
             <option value="Other">Other…</option>
           </select>
-          {otherCity && (
+
+          {!useOtherLocation && stateName && (
+            <select
+              value={district}
+              onChange={e => setDistrict(e.target.value)}
+              className="w-full border border-rule bg-cream px-4 py-3 text-sm focus:outline-none focus:border-ink"
+            >
+              <option value="">Select a district…</option>
+              {(INDIA_STATES[stateName] || []).map(d => <option key={d} value={d}>{d}</option>)}
+            </select>
+          )}
+
+          {useOtherLocation && (
             <input
               type="text"
-              value={location}
-              onChange={e => setLocation(e.target.value)}
-              placeholder="Enter your city"
+              value={otherLocation}
+              onChange={e => setOtherLocation(e.target.value)}
+              placeholder="Enter location"
               className="w-full border border-rule bg-cream px-4 py-3 text-sm focus:outline-none focus:border-ink"
             />
           )}
@@ -150,11 +182,11 @@ export default function AdminSetup() {
         <span className="label block mb-1">Display board</span>
         <div className="mt-6">
           <span className="label block mb-1">Welcome message <span className="normal-case font-normal text-graphite">(optional)</span></span>
-          <p className="text-xs text-graphite mb-3">Shown permanently on the display board — e.g. "Welcome to Shifa Hospital. Please take a seat."</p>
+          <p className="text-xs text-graphite mb-3">Shown permanently on the display board — e.g. "Welcome. Please take a seat and watch the board for your token."</p>
           <textarea
             value={displayMessage}
             onChange={e => setDisplayMessage(e.target.value)}
-            placeholder="e.g. Welcome to Shifa Hospital. Please take a seat."
+            placeholder="e.g. Welcome. Please take a seat and watch the board for your token."
             rows={3}
             maxLength={300}
             className="w-full sm:max-w-lg border border-rule bg-cream px-4 py-3 text-sm focus:outline-none focus:border-ink resize-none"
