@@ -36,18 +36,30 @@ export default function Home() {
       {/* Hero */}
       <div className="grid lg:grid-cols-12 gap-8 lg:gap-12 items-center">
         <div className="lg:col-span-6">
-          <img
-            src={dark ? '/svg/queueless-wordmark-dark.svg' : '/svg/queueless-lockup.svg'}
-            alt="QueueLess - Smart Queue Management"
-            className="h-12 sm:h-16 w-auto mb-6"
-          />
+          <div className="flex items-center gap-4 mb-8">
+            <div className="shrink-0 bg-white rounded p-1.5 border border-rule">
+              <img
+                src="/png/jayadeva-logo.jpg"
+                alt="Sri Jayadeva Institute of Cardiovascular Sciences and Research"
+                className="h-14 sm:h-16 w-auto"
+              />
+            </div>
+            <div className="border-l border-rule pl-4 min-w-0">
+              <div className="font-display text-base sm:text-xl leading-[1.15] tracking-tight text-ink uppercase">
+                Sri Jayadeva Institute of Cardiovascular Sciences and Research
+              </div>
+              <div className="mt-1.5 text-[10px] sm:text-[11px] tracking-[0.15em] uppercase text-graphite">
+                Outpatient Token &amp; Queue System
+              </div>
+            </div>
+          </div>
           <h1 className="font-display text-5xl sm:text-6xl lg:text-7xl tracking-tightest leading-[0.95]">
             Take a digital<br />
             <em className="text-accent">token.</em> Watch<br />
             your position live.
           </h1>
           <p className="mt-6 text-base text-graphite max-w-lg leading-relaxed">
-            QueueLess replaces paper slips and crowded waiting rooms with a real-time, browser-based queue.
+            This service replaces paper slips and crowded waiting rooms with a real-time, browser-based queue.
             Pull a token from anywhere — a phone in a parking lot, a laptop across town — and arrive at the
             counter only when the screen says it's your turn.
           </p>
@@ -114,6 +126,17 @@ export default function Home() {
             </div>
           )}
         </aside>
+      </div>
+
+      {/* Institute location */}
+      <div className="mt-12 lg:mt-16 pt-6 border-t border-rule flex items-start gap-2.5 text-sm">
+        <img src="/svg/location-pin.svg" alt="" aria-hidden="true" className="w-4 h-4 mt-0.5 shrink-0 opacity-70" />
+        <div>
+          <div className="label mb-1">Location</div>
+          <p className="text-ink leading-relaxed max-w-md">
+            Bannerghatta Road in Jayanagar 9th Block, Bengaluru, Karnataka 560069
+          </p>
+        </div>
       </div>
     </div>
   );

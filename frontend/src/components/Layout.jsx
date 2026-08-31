@@ -9,7 +9,6 @@ import AssistantDock from './AssistantDock.jsx';
 import MessagingDeck from './MessagingDeck.jsx';
 import NotificationBell from './NotificationBell.jsx';
 import ErrorBoundary from './ErrorBoundary.jsx';
-import { RELEASE_BADGE } from '../config/release.js';
 
 export default function Layout({ children }) {
   const { user, logout } = useAuth();
@@ -444,7 +443,6 @@ export default function Layout({ children }) {
           </div>
           <span className="flex items-center gap-3">
             <Link to="/credits" className="hover:text-ink transition-colors underline underline-offset-2">Credits</Link>
-            <span className="font-mono">{RELEASE_BADGE} · cloud-native token qms</span>
           </span>
         </div>
       </footer>
