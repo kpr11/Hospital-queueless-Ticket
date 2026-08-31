@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Navigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
-import { apiListStaff, apiGetRoster, apiAddRosterDoctor, apiRemoveRosterDoctor } from '../services/api.js';
+import { apiListStaff, apiGetRoster, apiAddRosterDoctor, apiRemoveRosterDoctor, apiReassignRoster } from '../services/api.js';
 
 const DEPT = 'opd';
 
@@ -65,6 +65,19 @@ export default function AdminRoster() {
     }
   };
 
+  const reassign = async (from) => {
+    setBusy(true);
+    setError(null);
+    try {
+      const r = await apiReassignRoster(from, DEPT);
+      setRoster(r.roster);
+    } catch (e) {
+      setError(e.response?.data?.error || 'Could not reassign.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const doctors = roster?.doctors || [];
   const availableCount = doctors.filter(d => d.status === 'available').length;
 
@@ -89,11 +102,22 @@ export default function AdminRoster() {
         <div className="animate-pulse text-graphite text-sm">Loading…</div>
       ) : (
         <>
-          <div className="flex items-center gap-6 mb-6 text-sm">
+          <div className="flex items-center gap-6 mb-6 text-sm flex-wrap">
             <span><span className="font-display text-2xl num mr-1">{doctors.length}</span> on roster</span>
             <span className="text-success"><span className="font-display text-2xl num mr-1">{availableCount}</span> available now</span>
             <span className="text-graphite">{roster?.date}</span>
           </div>
+
+          {roster?.unassignedWaiting > 0 && (
+            <div className="mb-6 p-3 border border-warn bg-warn/5 text-warn text-sm flex flex-wrap items-center justify-between gap-3">
+              <span>{roster.unassignedWaiting} patient(s) waiting with no room assigned{availableCount === 0 ? ' (no doctor is available)' : ''}.</span>
+              {availableCount > 0 && (
+                <button onClick={() => reassign('unassigned')} disabled={busy} className="text-xs border border-warn px-3 py-1.5 hover:bg-warn/10 disabled:opacity-40">
+                  Distribute to available doctors
+                </button>
+              )}
+            </div>
+          )}
 
           {/* Add a doctor */}
           {opdStaff.length === 0 ? (
@@ -136,28 +160,43 @@ export default function AdminRoster() {
             </div>
           ) : (
             <div className="border border-rule divide-y divide-rule bg-cream">
-              {doctors.map(d => (
-                <div key={d.username} className="px-4 py-3 flex items-center justify-between gap-3 text-sm">
-                  <div className="min-w-0">
-                    <span className="font-medium text-ink">{d.name || d.username}</span>
-                    <span className="text-graphite"> · Room {d.room}</span>
+              {doctors.map(d => {
+                const stranded = d.status !== 'available' && d.waiting > 0;
+                return (
+                  <div key={d.username} className="px-4 py-3 flex items-center justify-between gap-3 text-sm flex-wrap">
+                    <div className="min-w-0">
+                      <span className="font-medium text-ink">{d.name || d.username}</span>
+                      <span className="text-graphite"> · Room {d.room}</span>
+                      {d.waiting > 0 && (
+                        <span className={stranded ? 'text-warn' : 'text-graphite'}> · {d.waiting} waiting</span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-3 shrink-0">
+                      {stranded && (
+                        <button
+                          onClick={() => reassign(d.username)}
+                          disabled={busy}
+                          className="text-xs border border-warn text-warn px-2 py-1 hover:bg-warn/10 disabled:opacity-40"
+                        >
+                          Reassign {d.waiting}
+                        </button>
+                      )}
+                      <span className={`text-[10px] tracking-[0.15em] uppercase px-2 py-0.5 border ${
+                        d.status === 'available' ? 'text-success border-success/40' : 'text-graphite border-rule'
+                      }`}>
+                        {d.status === 'available' ? 'Available' : 'Off'}
+                      </span>
+                      <button
+                        onClick={() => remove(d.username)}
+                        disabled={busy}
+                        className="text-xs underline text-accent-deep hover:text-accent disabled:opacity-40"
+                      >
+                        Remove
+                      </button>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-3 shrink-0">
-                    <span className={`text-[10px] tracking-[0.15em] uppercase px-2 py-0.5 border ${
-                      d.status === 'available' ? 'text-success border-success/40' : 'text-graphite border-rule'
-                    }`}>
-                      {d.status === 'available' ? 'Available' : 'Off'}
-                    </span>
-                    <button
-                      onClick={() => remove(d.username)}
-                      disabled={busy}
-                      className="text-xs underline text-accent-deep hover:text-accent disabled:opacity-40"
-                    >
-                      Remove
-                    </button>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </>

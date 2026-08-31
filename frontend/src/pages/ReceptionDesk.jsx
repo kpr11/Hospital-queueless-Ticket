@@ -420,7 +420,7 @@ export default function ReceptionDesk() {
                           <span className="font-medium text-ink">{p.name}</span>
                           {p.priorityRequested && <span className="ml-1.5 text-[10px] text-accent font-bold" title="Priority">P</span>}
                           <span className="text-graphite block sm:inline sm:ml-1"> {p.age}/{p.gender[0].toUpperCase()} · {p.mobile} · {labelOf(p.department)}</span>
-                          {p.status === 'tokenIssued' && <span className="text-success"> · token #{p.tokenNumber}</span>}
+                          {p.status === 'tokenIssued' && <span className="text-success"> · token #{p.tokenNumber}{p.room ? ` · Room ${p.room}` : ''}</span>}
                         </button>
                         <span className="flex items-center gap-2 shrink-0">
                           <span className={`text-[10px] tracking-[0.15em] uppercase px-2 py-0.5 border ${STATUS_STYLE[p.status] || 'border-rule text-graphite'}`}>

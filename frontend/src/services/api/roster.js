@@ -17,3 +17,7 @@ export const apiRemoveRosterDoctor = (username, department = 'opd') =>
 // A doctor flips their own availability for today: 'available' | 'off'.
 export const apiSetAvailability   = (status, department = 'opd') =>
   api.post('/roster/availability', { status, department }).then(r => r.data);
+
+// Admin — move a doctor's (or 'unassigned') waiting patients to available doctors.
+export const apiReassignRoster    = (from, department = 'opd') =>
+  api.post('/roster/reassign', { from, department }).then(r => r.data);

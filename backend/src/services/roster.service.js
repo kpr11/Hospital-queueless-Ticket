@@ -14,6 +14,21 @@ const { refs } = require('../config/firebase');
 
 const STATUS = Object.freeze({ OFF: 'off', AVAILABLE: 'available' });
 
+/** Waiting (not yet called) tokens for a department, grouped by assigned doctor. */
+async function waitingByDoctor(dept) {
+  const snap = await refs.tokens().once('value');
+  const waiting = Object.values(snap.val() || {}).filter(
+    (t) => t.status === 'waiting' && t.service === dept
+  );
+  const byDoctor = {};
+  let unassigned = 0;
+  for (const t of waiting) {
+    if (t.assignedTo) byDoctor[t.assignedTo] = (byDoctor[t.assignedTo] || 0) + 1;
+    else unassigned += 1;
+  }
+  return { byDoctor, unassigned, waiting };
+}
+
 function bad(message, statusCode = 400) {
   return Object.assign(new Error(message), { statusCode });
 }
@@ -31,15 +46,19 @@ function sortByRoom(a, b) {
 }
 
 async function getRoster(dept, date = todayKey()) {
-  const snap = await refs.roster(date, dept).once('value');
+  const [snap, { byDoctor, unassigned }] = await Promise.all([
+    refs.roster(date, dept).once('value'),
+    waitingByDoctor(dept),
+  ]);
   const val = snap.val() || {};
   const doctors = Object.entries(val.doctors || {})
-    .map(([username, d]) => ({ username, ...d }))
+    .map(([username, d]) => ({ username, ...d, waiting: byDoctor[username] || 0 }))
     .sort(sortByRoom);
   return {
     date,
     department: dept,
     doctors,
+    unassignedWaiting: unassigned,
     available: doctors.filter((d) => d.status === STATUS.AVAILABLE),
   };
 }
@@ -72,7 +91,10 @@ async function addDoctor(dept, { username, name, room, addedBy = null }) {
 }
 
 async function removeDoctor(dept, username) {
-  await refs.rosterDoctor(todayKey(), dept, String(username || '').trim()).remove();
+  const u = String(username || '').trim();
+  // Don't strand patients: hand any still-waiting ones to the other doctors first.
+  await reassign(dept, u).catch(() => {});
+  await refs.rosterDoctor(todayKey(), dept, u).remove();
   return getRoster(dept);
 }
 
@@ -104,4 +126,40 @@ async function assignRoom(dept) {
   return { username: pick.username, room: pick.room, name: pick.name };
 }
 
-module.exports = { STATUS, todayKey, getRoster, addDoctor, removeDoctor, setAvailability, assignRoom };
+/**
+ * Redistribute a doctor's still-waiting patients across the other available
+ * doctors, round-robin. `from` may be a username or 'unassigned'. Patients who
+ * have already been called are left alone. Returns { moved, toNone }.
+ */
+async function reassign(dept, from) {
+  const date = todayKey();
+  const { doctors } = await getRoster(dept, date);
+  const targets = doctors.filter(d => d.status === STATUS.AVAILABLE && d.username !== from);
+
+  const { waiting } = await waitingByDoctor(dept);
+  const toMove = waiting.filter(t =>
+    from === 'unassigned' ? !t.assignedTo : t.assignedTo === from
+  );
+  if (toMove.length === 0) return { moved: 0, toNone: 0, targets: targets.length };
+
+  let moved = 0;
+  let toNone = 0;
+  for (let i = 0; i < toMove.length; i++) {
+    const token = toMove[i];
+    const target = targets.length ? targets[i % targets.length] : null;
+    await refs.token(token.id).update({
+      assignedTo: target ? target.username : null,
+      room: target ? target.room : null,
+    });
+    if (token.patientId) {
+      await refs.patient(token.patientId).update({
+        room: target ? target.room : null,
+        assignedDoctor: target ? target.name : null,
+      }).catch(() => {});
+    }
+    if (target) moved += 1; else toNone += 1;
+  }
+  return { moved, toNone, targets: targets.length };
+}
+
+module.exports = { STATUS, todayKey, getRoster, addDoctor, removeDoctor, setAvailability, assignRoom, reassign };

@@ -1237,4 +1237,38 @@ describe('OPD roster, room assignment & consultations', () => {
       expect(r).not.toHaveProperty('username');
     }
   });
+
+  test('admin can redistribute a stood-down doctor\'s waiting patients', async () => {
+    // fresh room numbers so this test is independent of earlier ones
+    await request(app).post('/api/v1/roster/doctors').set('Authorization', `Bearer ${adminToken}`)
+      .send({ username: 'docA', room: '11' });
+    await request(app).post('/api/v1/roster/doctors').set('Authorization', `Bearer ${adminToken}`)
+      .send({ username: 'docB', room: '12' });
+    await request(app).post('/api/v1/roster/availability').set('Authorization', `Bearer ${drA}`).send({ status: 'available' });
+    await request(app).post('/api/v1/roster/availability').set('Authorization', `Bearer ${drB}`).send({ status: 'available' });
+
+    // issue a couple of OPD tokens
+    for (const [aadhaar, mobile] of [['234567890124', '9811100050'], ['789456123014', '9811100051']]) {
+      await reg({ aadhaar, mobile });
+      await request(app).post('/api/v1/patients/verify-issue')
+        .set('Authorization', `Bearer ${adminToken}`).send({ aadhaar, department: 'opd' });
+    }
+
+    // docA stands down, then admin moves docA's waiting patients to docB
+    await request(app).post('/api/v1/roster/availability').set('Authorization', `Bearer ${drA}`).send({ status: 'off' });
+    const res = await request(app).post('/api/v1/roster/reassign')
+      .set('Authorization', `Bearer ${adminToken}`).send({ from: 'docA' });
+    expect(res.status).toBe(200);
+    expect(res.body.toNone).toBe(0);
+
+    // nobody on the roster is still assigned patients in a closed room
+    const board = await request(app).get('/api/v1/roster').set('Authorization', `Bearer ${adminToken}`);
+    const docA = board.body.doctors.find(d => d.username === 'docA');
+    expect(docA.waiting).toBe(0);
+
+    // reassign requires admin
+    const forbidden = await request(app).post('/api/v1/roster/reassign')
+      .set('Authorization', `Bearer ${drB}`).send({ from: 'docB' });
+    expect(forbidden.status).toBe(403);
+  });
 });

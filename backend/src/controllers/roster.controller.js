@@ -16,7 +16,7 @@ async function getPublic(req, res) {
   res.json({
     date,
     department,
-    rooms: doctors.map(d => ({ room: d.room, doctor: d.name, status: d.status })),
+    rooms: doctors.map(d => ({ room: d.room, doctor: d.name, status: d.status, waiting: d.waiting || 0 })),
   });
 }
 
@@ -41,4 +41,19 @@ async function setAvailability(req, res) {
   res.json({ message: 'Availability updated.', roster });
 }
 
-module.exports = { get, getPublic, addDoctor, removeDoctor, setAvailability };
+// requireAdmin — redistribute a doctor's waiting patients. body: { from: '<username>' | 'unassigned' }
+async function reassign(req, res) {
+  const from = String(req.body?.from || '').trim();
+  if (!from) return res.status(400).json({ error: 'from is required.' });
+  const result = await rosterService.reassign(deptOf(req), from);
+  const roster = await rosterService.getRoster(deptOf(req));
+  res.json({
+    message: result.moved || result.toNone
+      ? `Moved ${result.moved} patient(s)${result.toNone ? `, ${result.toNone} left unassigned (no available doctor)` : ''}.`
+      : 'No waiting patients to move.',
+    ...result,
+    roster,
+  });
+}
+
+module.exports = { get, getPublic, addDoctor, removeDoctor, setAvailability, reassign };

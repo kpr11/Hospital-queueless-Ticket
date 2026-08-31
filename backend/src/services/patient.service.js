@@ -206,6 +206,8 @@ async function getRegistrationStatus(patientId) {
     tokenId: p.tokenId || null,
     tokenNumber: p.tokenNumber || null,
     tokenIssuedAt: p.tokenIssuedAt || null,
+    room: p.room || null,
+    assignedDoctor: p.assignedDoctor || null,
   };
 }
 

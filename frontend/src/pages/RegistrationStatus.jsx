@@ -49,12 +49,20 @@ export default function RegistrationStatus() {
       <div className={`mt-6 border p-5 ${s.tone}`}>
         <div className="text-xs tracking-[0.15em] uppercase font-medium">{s.label}</div>
         {reg.status === 'tokenIssued' && (
-          <div className="mt-3 flex items-baseline gap-3">
-            <span className="font-display text-token num leading-none tracking-tightest text-accent">
-              {String(reg.tokenNumber).padStart(2, '0')}
-            </span>
-            <span className="text-sm text-graphite">{labelOf(reg.department)}{reg.priorityRequested ? ' · priority' : ''}</span>
-          </div>
+          <>
+            <div className="mt-3 flex items-baseline gap-3">
+              <span className="font-display text-token num leading-none tracking-tightest text-accent">
+                {String(reg.tokenNumber).padStart(2, '0')}
+              </span>
+              <span className="text-sm text-graphite">{labelOf(reg.department)}{reg.priorityRequested ? ' · priority' : ''}</span>
+            </div>
+            {reg.room && (
+              <div className="mt-2 text-sm">
+                Go to <span className="font-medium text-ink">Room {reg.room}</span>
+                {reg.assignedDoctor ? <span className="text-graphite"> · {reg.assignedDoctor}</span> : null}
+              </div>
+            )}
+          </>
         )}
       </div>
 
