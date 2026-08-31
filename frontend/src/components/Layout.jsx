@@ -441,9 +441,6 @@ export default function Layout({ children }) {
               <span className="font-medium text-ink">QueueLess</span>
             )}
           </div>
-          <span className="flex items-center gap-3">
-            <Link to="/credits" className="hover:text-ink transition-colors underline underline-offset-2">Credits</Link>
-          </span>
         </div>
       </footer>
 
