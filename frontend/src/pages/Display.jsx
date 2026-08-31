@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { useQueueState } from '../hooks/useQueueState.js';
 import { useAppConfig } from '../hooks/useAppConfig.js';
 import { getServices, getServiceLabel } from '../utils/industry.js';
+import { apiGetRosterPublic } from '../services/api.js';
 
 export default function Display() {
   const { state, tokens, announcement } = useQueueState();
@@ -23,6 +24,7 @@ export default function Display() {
 
   const [time, setTime] = useState(new Date());
   const [flashId, setFlashId] = useState(null);
+  const [rooms, setRooms] = useState([]);
   const prevCalledRef = useRef({});
   const flashTimerRef = useRef(null);
 
@@ -30,6 +32,17 @@ export default function Display() {
     const t = setInterval(() => setTime(new Date()), 1000);
     return () => clearInterval(t);
   }, []);
+
+  // OPD runs multiple rooms — pull the (PII-free) room list so the board can
+  // show a "now serving" per room.
+  const showRooms = single?.id === 'opd';
+  useEffect(() => {
+    if (!showRooms) { setRooms([]); return; }
+    const load = () => apiGetRosterPublic('opd').then(d => setRooms(d.rooms || [])).catch(() => {});
+    load();
+    const id = setInterval(load, 12000);
+    return () => clearInterval(id);
+  }, [showRooms]);
 
   const tokenList = Object.values(tokens || {});
   const isPaused = state?.status === 'paused';
@@ -112,7 +125,9 @@ export default function Display() {
         </div>
       )}
 
-      {single ? (
+      {single && rooms.length > 0 ? (
+        <RoomsBoard service={single} rooms={rooms} tokenList={tokenList} flashId={flashId} />
+      ) : single ? (
         <SingleDepartmentBoard
           service={single}
           tokenList={tokenList}
@@ -192,6 +207,73 @@ export default function Display() {
           Live
         </span>
       </div>
+    </div>
+  );
+}
+
+/** One department, one card per consulting room (OPD). */
+function RoomsBoard({ service, rooms, tokenList, flashId }) {
+  const forRoom = (room) => tokenList.filter(t => t.service === service.id && String(t.room) === String(room));
+  const unassignedWaiting = tokenList.filter(
+    t => t.status === 'waiting' && t.service === service.id && !t.room
+  );
+  const cols = rooms.length <= 2 ? 'sm:grid-cols-2' : rooms.length <= 3 ? 'sm:grid-cols-3' : 'sm:grid-cols-2 lg:grid-cols-3';
+
+  return (
+    <div className="flex-1 p-8">
+      <div className={`grid gap-6 ${cols}`}>
+        {rooms
+          .slice()
+          .sort((a, b) => String(a.room).localeCompare(String(b.room), undefined, { numeric: true }))
+          .map((r) => {
+            const called = forRoom(r.room).find(t => t.status === 'called');
+            const waiting = forRoom(r.room).filter(t => t.status === 'waiting');
+            const isFlashing = called && flashId === called.id;
+            const off = r.status !== 'available';
+            return (
+              <div
+                key={r.room}
+                className={`border p-6 flex flex-col transition-all duration-500 ${
+                  called ? 'border-accent bg-accent/10' : off ? 'border-paper/10 bg-paper/[0.03]' : 'border-paper/10 bg-paper/5'
+                } ${isFlashing ? 'scale-[1.03]' : ''}`}
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-sm tracking-[0.2em] uppercase text-paper/60">Room {r.room}</span>
+                  <span className={`text-[10px] tracking-[0.15em] uppercase px-2 py-0.5 border ${off ? 'text-paper/30 border-paper/15' : 'text-success border-success/40'}`}>
+                    {off ? 'Off' : 'In'}
+                  </span>
+                </div>
+                <div className="mt-1 text-sm text-paper/40 truncate">{r.doctor}</div>
+
+                <div
+                  className={`font-display num leading-none tracking-tightest flex-1 flex items-center transition-colors ${
+                    called ? 'text-accent' : 'text-paper/15'
+                  }`}
+                  style={{ fontSize: 'clamp(3.5rem, 9vw, 8rem)' }}
+                >
+                  {called ? String(called.number).padStart(2, '0') : '—'}
+                </div>
+
+                <div className="flex items-center justify-between text-xs">
+                  <span className={called ? 'text-accent font-medium' : 'text-paper/30'}>
+                    {called ? 'Now serving' : off ? 'Room closed' : 'Ready'}
+                  </span>
+                  <span className="text-paper/40">{waiting.length} waiting</span>
+                </div>
+              </div>
+            );
+          })}
+      </div>
+
+      {unassignedWaiting.length > 0 && (
+        <div className="mt-6 border border-paper/10 bg-paper/5 p-4 text-sm text-paper/50">
+          <span className="text-[10px] tracking-[0.15em] uppercase text-paper/40 mr-2">Not yet assigned</span>
+          <span className="font-mono">
+            {unassignedWaiting.sort((a, b) => a.number - b.number).slice(0, 10)
+              .map(t => String(t.number).padStart(2, '0')).join('  ')}
+          </span>
+        </div>
+      )}
     </div>
   );
 }

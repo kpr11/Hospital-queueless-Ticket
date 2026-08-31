@@ -8,6 +8,7 @@ import { getServiceLabel, getServices } from '../utils/industry.js';
 import { apiStaffCallNext, apiSkipToken, apiSetStaffTokenNote, apiStaffReferToken, apiPendingRegistrations, apiVerifyAndIssueToken, apiGetRoster, apiSetAvailability } from '../services/api.js';
 import StatusBadge from '../components/StatusBadge.jsx';
 import LiveTimer from '../components/LiveTimer.jsx';
+import ConsultationPanel from '../components/ConsultationPanel.jsx';
 
 export default function StaffDashboard() {
   const { staff, logout } = useStaff();
@@ -395,6 +396,15 @@ export default function StaffDashboard() {
           </div>
         )}
       </div>
+
+      {/* OPD consultation workspace — notes, lab orders, "done" */}
+      {isOpd && called && (
+        <ConsultationPanel
+          key={called.id}
+          token={called}
+          onCompleted={() => { setNote(''); setErr(null); }}
+        />
+      )}
 
       {/* Patient check-in — verify Aadhaar, issue token (hospital only) */}
       {isMedical && (

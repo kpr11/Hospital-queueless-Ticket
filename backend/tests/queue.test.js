@@ -112,6 +112,11 @@ jest.mock('../src/config/firebase', () => {
       feedbackEntry: (t) => makeRef(`feedback/${t}`),
       patients: () => makeRef('hospital/patients'),
       patient: (id) => makeRef(`hospital/patients/${id}`),
+      roster: (date, dept) => makeRef(`hospital/roster/${date}/${dept}`),
+      rosterDoctor: (date, dept, u) => makeRef(`hospital/roster/${date}/${dept}/doctors/${u}`),
+      rosterCursor: (date, dept) => makeRef(`hospital/roster/${date}/${dept}/cursor`),
+      consultations: () => makeRef('hospital/consultations'),
+      consultation: (id) => makeRef(`hospital/consultations/${id}`),
     },
     __resetStore: () => Object.keys(store).forEach(k => delete store[k]),
   };
@@ -1118,5 +1123,118 @@ describe('Patient registration & Aadhaar-verified token issuance', () => {
     expect(res.status).toBe(200);
     expect(res.body.total).toBeGreaterThanOrEqual(1);
     expect(typeof res.body.tokenIssued).toBe('number');
+  });
+});
+
+describe('OPD roster, room assignment & consultations', () => {
+  let adminToken;
+  let drA, drB;
+
+  const reg = (over) => request(app).post('/api/v1/patients/register').send({
+    name: 'Ravi Kumar', age: 50, gender: 'male', mobile: '9811100000',
+    address: '1 MG Road, Bengaluru', aadhaar: '234567890124',
+    department: 'opd', consent: true, ...over,
+  });
+
+  beforeAll(async () => {
+    adminToken = (await request(app).post('/api/v1/auth/login')
+      .send({ username: 'admin', password: 'testpassword123' })).body.token;
+
+    for (const u of ['docA', 'docB']) {
+      await request(app).post('/api/v1/admin/staff').set('Authorization', `Bearer ${adminToken}`)
+        .send({ username: u, password: 'staffpass123', service: 'opd', displayName: u.toUpperCase() });
+    }
+    drA = (await request(app).post('/api/v1/staff/login').send({ username: 'docA', password: 'staffpass123' })).body.token;
+    drB = (await request(app).post('/api/v1/staff/login').send({ username: 'docB', password: 'staffpass123' })).body.token;
+  });
+
+  test('a doctor cannot go available before being rostered', async () => {
+    const res = await request(app).post('/api/v1/roster/availability')
+      .set('Authorization', `Bearer ${drA}`).send({ status: 'available' });
+    expect(res.status).toBe(409);
+  });
+
+  test('admin rosters two doctors; tokens assign round-robin by room', async () => {
+    await request(app).post('/api/v1/roster/doctors').set('Authorization', `Bearer ${adminToken}`)
+      .send({ username: 'docA', room: '1' });
+    await request(app).post('/api/v1/roster/doctors').set('Authorization', `Bearer ${adminToken}`)
+      .send({ username: 'docB', room: '2' });
+    await request(app).post('/api/v1/roster/availability').set('Authorization', `Bearer ${drA}`).send({ status: 'available' });
+    await request(app).post('/api/v1/roster/availability').set('Authorization', `Bearer ${drB}`).send({ status: 'available' });
+
+    const rooms = [];
+    for (const [aadhaar, mobile] of [['234567890124', '9811100001'], ['789456123014', '9811100002'], ['555444333229', '9811100003']]) {
+      await reg({ aadhaar, mobile });
+      const issue = await request(app).post('/api/v1/patients/verify-issue')
+        .set('Authorization', `Bearer ${adminToken}`).send({ aadhaar, department: 'opd' });
+      expect(issue.status).toBe(201);
+      rooms.push(issue.body.token.room);
+    }
+    // round-robin over rooms 1 and 2 → [1, 2, 1] (order-independent check)
+    expect(rooms.filter(r => r === '1').length).toBe(2);
+    expect(rooms.filter(r => r === '2').length).toBe(1);
+  });
+
+  test('the assigned doctor runs a full consultation and closes it', async () => {
+    await request(app).post('/api/v1/roster/doctors').set('Authorization', `Bearer ${adminToken}`)
+      .send({ username: 'docA', room: '1' });
+    await request(app).post('/api/v1/roster/availability').set('Authorization', `Bearer ${drA}`).send({ status: 'available' });
+
+    await reg({ aadhaar: '234567890124', mobile: '9811100010', name: 'Consult P' });
+    const issue = await request(app).post('/api/v1/patients/verify-issue')
+      .set('Authorization', `Bearer ${adminToken}`).send({ aadhaar: '234567890124', department: 'opd' });
+    const token = issue.body.token;
+
+    // whichever doctor it landed on drives the consultation
+    const drToken = token.assignedTo === 'docA' ? drA : drB;
+
+    // the doctor calls the patient, then opens the record
+    await request(app).post('/api/v1/staff/queue/call-next').set('Authorization', `Bearer ${drToken}`);
+    const opened = await request(app).get('/api/v1/consultations')
+      .set('Authorization', `Bearer ${drToken}`).query({ tokenId: token.id });
+    expect(opened.status).toBe(200);
+    const cId = opened.body.consultation.id;
+    expect(opened.body.consultation.status).toBe('open');
+
+    // save notes
+    const upd = await request(app).put(`/api/v1/consultations/${cId}`)
+      .set('Authorization', `Bearer ${drToken}`).send({ diagnosis: 'Hypertension', notes: 'Start amlodipine 5mg' });
+    expect(upd.body.consultation.diagnosis).toBe('Hypertension');
+
+    // order a blood test → a referred token appears in the lab queue
+    const order = await request(app).post(`/api/v1/consultations/${cId}/lab-orders`)
+      .set('Authorization', `Bearer ${drToken}`).send({ tests: ['blood', 'ct'] });
+    expect(order.status).toBe(200);
+    expect(order.body.consultation.labOrders).toHaveLength(2);
+    const depts = order.body.consultation.labOrders.map(o => o.department).sort();
+    expect(depts).toEqual(['lab', 'radiology']);
+
+    // another doctor cannot touch this consultation
+    const otherToken = drToken === drA ? drB : drA;
+    const forbidden = await request(app).put(`/api/v1/consultations/${cId}`)
+      .set('Authorization', `Bearer ${otherToken}`).send({ notes: 'hijack' });
+    expect(forbidden.status).toBe(403);
+
+    // complete → consultation closes
+    const done = await request(app).post(`/api/v1/consultations/${cId}/complete`)
+      .set('Authorization', `Bearer ${drToken}`).send({});
+    expect(done.status).toBe(200);
+    expect(done.body.consultation.status).toBe('completed');
+
+    // the patient's history now surfaces this visit
+    const hist = await request(app).get('/api/v1/consultations')
+      .set('Authorization', `Bearer ${drToken}`).query({ patientId: token.patientId });
+    expect(hist.body.history.some(h => h.id === cId)).toBe(true);
+  });
+
+  test('the public roster board exposes rooms without usernames', async () => {
+    const res = await request(app).get('/api/v1/roster/public');
+    expect(res.status).toBe(200);
+    expect(Array.isArray(res.body.rooms)).toBe(true);
+    for (const r of res.body.rooms) {
+      expect(r).toHaveProperty('room');
+      expect(r).toHaveProperty('doctor');
+      expect(r).not.toHaveProperty('username');
+    }
   });
 });

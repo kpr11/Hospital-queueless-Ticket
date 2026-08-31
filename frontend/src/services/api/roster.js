@@ -4,6 +4,10 @@ import { api } from './client.js';
 export const apiGetRoster         = (department = 'opd') =>
   api.get('/roster', { params: { department } }).then(r => r.data);
 
+// Public, PII-free room list for the display board (no auth).
+export const apiGetRosterPublic   = (department = 'opd') =>
+  api.get('/roster/public', { params: { department } }).then(r => r.data);
+
 export const apiAddRosterDoctor   = ({ username, name, room, department = 'opd' }) =>
   api.post('/roster/doctors', { username, name, room, department }).then(r => r.data);
 

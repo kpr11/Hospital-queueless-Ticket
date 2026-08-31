@@ -66,7 +66,7 @@ async function resumeService(service) {
     .catch(err => console.error('[analytics]', err.message));
 }
 
-async function issueToken({ service = 'general', email = null, priority = 'normal', groupSize = 1, patientName = null, note = null, patientId = null, room = null, assignedTo = null } = {}) {
+async function issueToken({ service = 'general', email = null, priority = 'normal', groupSize = 1, patientName = null, note = null, patientId = null, room = null, assignedTo = null, referred = false } = {}) {
   const stateSnap = await refs.queueState().once('value');
   const state = stateSnap.val();
   const isPriorityToken = priority === 'priority';
@@ -114,7 +114,7 @@ async function issueToken({ service = 'general', email = null, priority = 'norma
     groupSize: safeGroupSize,
     patientName: patientName ? String(patientName).trim().slice(0, 100) : null,
     note: note ? String(note).trim().slice(0, 500) : null,
-    referred: false,
+    referred: referred === true,
     patientId: patientId || null,
     room: room || null,
     assignedTo: assignedTo || null,

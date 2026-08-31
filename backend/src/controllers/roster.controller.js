@@ -10,6 +10,16 @@ async function get(req, res) {
   res.json(await rosterService.getRoster(deptOf(req)));
 }
 
+// Public — the display board needs room + doctor name (no usernames, no PII).
+async function getPublic(req, res) {
+  const { date, department, doctors } = await rosterService.getRoster(deptOf(req));
+  res.json({
+    date,
+    department,
+    rooms: doctors.map(d => ({ room: d.room, doctor: d.name, status: d.status })),
+  });
+}
+
 // requireAdmin — put a doctor on today's roster with a room number.
 async function addDoctor(req, res) {
   const { username, name, room } = req.body || {};
@@ -31,4 +41,4 @@ async function setAvailability(req, res) {
   res.json({ message: 'Availability updated.', roster });
 }
 
-module.exports = { get, addDoctor, removeDoctor, setAvailability };
+module.exports = { get, getPublic, addDoctor, removeDoctor, setAvailability };
