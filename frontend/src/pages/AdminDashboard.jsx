@@ -568,10 +568,31 @@ export default function AdminDashboard() {
           <h1 className="font-display text-5xl tracking-tightest leading-none mt-2">Queue control</h1>
         </div>
         <div className="flex items-center gap-4 flex-wrap">
+          <a href="/display" target="_blank" rel="noreferrer" className="btn-secondary text-sm">Display board ↗</a>
           <Link to="/admin/appointments" className="btn-secondary text-sm">Appointments</Link>
           <Link to="/admin/feedback" className="btn-secondary text-sm">Feedback</Link>
           <Link to="/admin/report" className="btn-secondary text-sm">Report</Link>
           <StatusBadge status={state?.status || 'running'} />
+        </div>
+      </div>
+
+      {/* Display boards — open on a wall-mounted screen. "All" shows every counter;
+          each department link is a focused, TV-friendly board for that area. */}
+      <div className="mb-6 border border-rule bg-paper p-4">
+        <div className="label mb-3">Display boards <span className="normal-case font-normal text-graphite">— open on a monitor / TV</span></div>
+        <div className="flex flex-wrap gap-2">
+          <a href="/display" target="_blank" rel="noreferrer" className="text-xs border border-rule px-3 py-1.5 hover:border-ink transition-colors">All departments ↗</a>
+          {services.map(s => (
+            <a
+              key={s.id}
+              href={`/display?dept=${encodeURIComponent(s.id)}`}
+              target="_blank"
+              rel="noreferrer"
+              className="text-xs border border-rule px-3 py-1.5 hover:border-ink transition-colors"
+            >
+              {s.title} ↗
+            </a>
+          ))}
         </div>
       </div>
 
