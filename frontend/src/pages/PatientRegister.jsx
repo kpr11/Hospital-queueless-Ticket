@@ -89,14 +89,14 @@ export default function PatientRegister() {
   return (
     <div className="max-w-2xl mx-auto px-6 py-16">
       <div className="label mb-3">{cfg.orgName} · Patient registration</div>
-      <h1 className="font-display text-5xl tracking-tightest leading-[0.95]">Register your visit</h1>
+      <h1 className="font-display text-5xl tracking-tightest leading-[0.95]">Register patient</h1>
       <p className="mt-4 text-graphite max-w-xl">
         Fill in your details and pick the department you're here to see. You'll collect your
         token number at that department's desk after a quick Aadhaar check.
       </p>
 
       <div className="mt-10">
-        <PatientForm onSubmit={handleSubmit} busy={busy} error={error} submitLabel="Register my visit" />
+        <PatientForm onSubmit={handleSubmit} busy={busy} error={error} submitLabel="Register patient" />
       </div>
 
       <p className="mt-6 text-xs text-graphite">
