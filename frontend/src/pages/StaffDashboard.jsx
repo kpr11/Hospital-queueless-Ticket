@@ -5,7 +5,7 @@ import { useQueueState } from '../hooks/useQueueState.js';
 import { usePresence } from '../hooks/usePresence.js';
 import { useAppConfig } from '../hooks/useAppConfig.js';
 import { getServiceLabel, getServices } from '../utils/industry.js';
-import { apiStaffCallNext, apiSkipToken, apiSetStaffTokenNote, apiStaffReferToken, apiPendingRegistrations, apiVerifyAndIssueToken } from '../services/api.js';
+import { apiStaffCallNext, apiSkipToken, apiSetStaffTokenNote, apiStaffReferToken, apiPendingRegistrations, apiVerifyAndIssueToken, apiGetRoster, apiSetAvailability } from '../services/api.js';
 import StatusBadge from '../components/StatusBadge.jsx';
 import LiveTimer from '../components/LiveTimer.jsx';
 
@@ -32,9 +32,27 @@ export default function StaffDashboard() {
   const [checkinError, setCheckinError] = useState(null);
   const [checkinIssued, setCheckinIssued] = useState(null);
 
+  // OPD multi-room roster — a doctor marks themselves available so reception can
+  // hand them patients round-robin.
+  const [roster, setRoster] = useState(null);
+  const [availBusy, setAvailBusy] = useState(false);
+  const isOpd = staff?.service === 'opd';
+
   usePresence(staff?.username, staff?.service);
 
   const isMedical = cfg.industry === 'medical';
+
+  const loadRoster = useCallback(() => {
+    if (!isOpd) return;
+    apiGetRoster('opd').then(setRoster).catch(() => {});
+  }, [isOpd]);
+
+  useEffect(() => {
+    if (!isOpd) return;
+    loadRoster();
+    const id = setInterval(loadRoster, 10000);
+    return () => clearInterval(id);
+  }, [isOpd, loadRoster]);
 
   const loadPending = useCallback(() => {
     if (!staff?.service) return;
@@ -60,10 +78,19 @@ export default function StaffDashboard() {
   // Counters this staff member can refer a patient to (everything except their own).
   const referOptions = getServices(cfg.industry).filter(s => s.id !== myService);
 
-  const called = tokenList.find(t => t.status === 'called' && t.service === myService) || null;
+  // OPD doctors each run a room: they see their own assigned patients (plus any
+  // that were issued while no doctor was available). Other counters see all.
+  const mineOrUnassigned = (t) => !isOpd || t.assignedTo === staff.username || !t.assignedTo;
+
+  const called = tokenList.find(t => t.status === 'called' && t.service === myService && mineOrUnassigned(t)) || null;
   const waiting = tokenList
-    .filter(t => t.status === 'waiting' && t.service === myService)
+    .filter(t => t.status === 'waiting' && t.service === myService && mineOrUnassigned(t))
     .sort((a, b) => {
+      if (isOpd) {
+        const am = a.assignedTo === staff.username ? 0 : 1;
+        const bm = b.assignedTo === staff.username ? 0 : 1;
+        if (am !== bm) return am - bm;
+      }
       const ap = isPriorityTier(a), bp = isPriorityTier(b);
       if (ap && !bp) return -1;
       if (!ap && bp) return 1;
@@ -75,6 +102,22 @@ export default function StaffDashboard() {
   );
 
   const isPaused = state?.status === 'paused';
+
+  const myRosterEntry = (roster?.doctors || []).find(d => d.username === staff.username) || null;
+  const isAvailable = myRosterEntry?.status === 'available';
+
+  const toggleAvailability = async () => {
+    setAvailBusy(true);
+    setErr(null);
+    try {
+      const r = await apiSetAvailability(isAvailable ? 'off' : 'available', 'opd');
+      setRoster(r.roster);
+    } catch (e) {
+      setErr(e.response?.data?.error || 'Could not update availability.');
+    } finally {
+      setAvailBusy(false);
+    }
+  };
 
   const handleCallNext = async () => {
     setBusy(true);
@@ -199,6 +242,33 @@ export default function StaffDashboard() {
         <div className="mb-6 p-4 border border-warn bg-warn/5 text-warn text-sm">
           Queue is paused. Contact admin to resume.
         </div>
+      )}
+
+      {/* OPD availability — reception hands patients to available doctors round-robin */}
+      {isOpd && (
+        myRosterEntry ? (
+          <div className={`mb-6 p-4 border flex flex-wrap items-center justify-between gap-3 ${isAvailable ? 'border-success/40 bg-success/5' : 'border-rule bg-cream'}`}>
+            <div className="text-sm">
+              <span className="label">Room {myRosterEntry.room}</span>
+              <div className="mt-1">
+                {isAvailable
+                  ? <span className="text-success font-medium">You’re available — new patients are being assigned to you.</span>
+                  : <span className="text-graphite">You’re marked off. Go available to start receiving patients.</span>}
+              </div>
+            </div>
+            <button
+              onClick={toggleAvailability}
+              disabled={availBusy}
+              className={`text-sm px-4 py-2 border font-medium disabled:opacity-40 ${isAvailable ? 'border-rule text-graphite hover:border-ink' : 'bg-ink text-paper border-ink'}`}
+            >
+              {availBusy ? '…' : isAvailable ? 'Go off duty' : 'I’m available'}
+            </button>
+          </div>
+        ) : (
+          <div className="mb-6 p-4 border border-warn bg-warn/5 text-warn text-sm">
+            You’re not on today’s OPD roster. Ask reception to add you (with your room number) under Roster.
+          </div>
+        )
       )}
 
       {/* Now serving */}

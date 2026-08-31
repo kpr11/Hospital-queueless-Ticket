@@ -16,6 +16,7 @@ const { refs } = require('../config/firebase');
 const config = require('../config/env');
 const { normaliseAadhaar, isValidAadhaar, last4 } = require('../utils/aadhaar');
 const queueService = require('./queue.service');
+const rosterService = require('./roster.service');
 const analytics = require('./analytics.service');
 const { emit, EVENTS } = require('../events/bus');
 
@@ -336,6 +337,13 @@ async function verifyAndIssueToken({ patientId = null, aadhaar, department, issu
     throw bad(`A token (#${patientRecord.tokenNumber}) has already been issued to this patient.`, 409);
   }
 
+  // OPD runs several consulting rooms — hand the patient to the next available
+  // doctor round-robin (P1→R1, P2→R2 … P6→R1). Other departments keep one queue.
+  let assignment = null;
+  if (dept === 'opd') {
+    assignment = await rosterService.assignRoom(dept).catch(() => null);
+  }
+
   // Emergency dept, or a priority request made at registration, is served first.
   const priority = priorityFor(dept, patientRecord.priorityRequested) ? 'priority' : 'normal';
   const token = await queueService.issueToken({
@@ -344,6 +352,8 @@ async function verifyAndIssueToken({ patientId = null, aadhaar, department, issu
     priority,
     patientId: patientRecord.id,
     note: patientRecord.priorityReason || null,
+    room: assignment?.room || null,
+    assignedTo: assignment?.username || null,
   });
 
   const now = Date.now();
@@ -353,6 +363,8 @@ async function verifyAndIssueToken({ patientId = null, aadhaar, department, issu
     tokenNumber: token.number,
     tokenIssuedAt: now,
     tokenIssuedBy: issuedBy || null,
+    room: assignment?.room || null,
+    assignedDoctor: assignment?.name || null,
   });
 
   analytics.logEvent({
@@ -365,6 +377,7 @@ async function verifyAndIssueToken({ patientId = null, aadhaar, department, issu
 
   return {
     token,
+    assignment,
     patient: sanitise({
       ...patientRecord,
       status: STATUS.TOKEN_ISSUED,
@@ -372,6 +385,8 @@ async function verifyAndIssueToken({ patientId = null, aadhaar, department, issu
       tokenNumber: token.number,
       tokenIssuedAt: now,
       tokenIssuedBy: issuedBy || null,
+      room: assignment?.room || null,
+      assignedDoctor: assignment?.name || null,
     }),
   };
 }

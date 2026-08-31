@@ -87,8 +87,9 @@ async function verifyAndIssue(req, res) {
     department,
     issuedBy: req.user.sub,
   });
+  const roomNote = result.assignment ? ` — Room ${result.assignment.room} (${result.assignment.name})` : '';
   res.status(201).json({
-    message: `Token #${result.token.number} issued for ${department}.`,
+    message: `Token #${result.token.number} issued for ${department}${roomNote}.`,
     ...result,
   });
 }

@@ -40,6 +40,7 @@ const Display = lazy(() => import('./pages/Display.jsx'));
 const TokenHistory = lazy(() => import('./pages/TokenHistory.jsx'));
 const BookAppointment = lazy(() => import('./pages/BookAppointment.jsx'));
 const AdminAppointments = lazy(() => import('./pages/AdminAppointments.jsx'));
+const AdminRoster = lazy(() => import('./pages/AdminRoster.jsx'));
 
 function PageFallback() {
   return <div className="max-w-3xl mx-auto px-6 py-24 text-center text-graphite animate-pulse">Loading…</div>;
@@ -84,6 +85,7 @@ export default function App() {
               <Route path="audit"            element={<AdminAudit />} />
               <Route path="appointments"     element={<AdminAppointments />} />
               <Route path="reception"        element={<ReceptionDesk />} />
+              <Route path="roster"           element={<AdminRoster />} />
               <Route path="change-password"  element={<AdminChangePassword />} />
               <Route path="profile"          element={<AdminProfile />} />
             </Route>

@@ -8,6 +8,7 @@
 export { api, ADMIN_TOKEN_KEY, STAFF_TOKEN_KEY, TOKEN_KEY } from './api/client.js';
 export * from './api/public.js';
 export * from './api/patients.js';
+export * from './api/roster.js';
 export * from './api/auth.js';
 export * from './api/queue.js';
 export * from './api/queues.js';

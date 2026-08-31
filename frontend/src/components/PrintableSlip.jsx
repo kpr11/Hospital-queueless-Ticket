@@ -67,6 +67,7 @@ export function PrintableTokenSlip({ token, patientName, departmentLabel, orgNam
     ['Patient', patientName || '—'],
     ['Issued', new Date(token.issuedAt || token.tokenIssuedAt || Date.now()).toLocaleString()],
   ];
+  if (token.room) rows.push(['Room', String(token.room)]);
   if (token.priority === 'priority') rows.push(['Priority', 'Yes']);
   return (
     <Frame
@@ -75,7 +76,9 @@ export function PrintableTokenSlip({ token, patientName, departmentLabel, orgNam
       kicker={departmentLabel}
       big={`#${String(token.number).padStart(2, '0')}`}
       rows={rows}
-      footer="Please wait until your number is called on the display board."
+      footer={token.room
+        ? `Go to Room ${token.room} and wait until your number is called.`
+        : 'Please wait until your number is called on the display board.'}
     />
   );
 }

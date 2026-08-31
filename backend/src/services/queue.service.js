@@ -66,7 +66,7 @@ async function resumeService(service) {
     .catch(err => console.error('[analytics]', err.message));
 }
 
-async function issueToken({ service = 'general', email = null, priority = 'normal', groupSize = 1, patientName = null, note = null, patientId = null } = {}) {
+async function issueToken({ service = 'general', email = null, priority = 'normal', groupSize = 1, patientName = null, note = null, patientId = null, room = null, assignedTo = null } = {}) {
   const stateSnap = await refs.queueState().once('value');
   const state = stateSnap.val();
   const isPriorityToken = priority === 'priority';
@@ -116,6 +116,8 @@ async function issueToken({ service = 'general', email = null, priority = 'norma
     note: note ? String(note).trim().slice(0, 500) : null,
     referred: false,
     patientId: patientId || null,
+    room: room || null,
+    assignedTo: assignedTo || null,
   };
   await refs.token(id).set(tokenRecord);
 
@@ -184,7 +186,7 @@ function sortByPriorityThenNumber(a, b) {
   return a.number - b.number;
 }
 
-async function callNextToken(service = 'general', staffUsername = null) {
+async function callNextToken(service = 'general', staffUsername = null, { assignedTo = null } = {}) {
   const stateSnap = await refs.queueState().once('value');
   const state = stateSnap.val();
   if (state.status === QUEUE_STATUS.PAUSED) {
@@ -209,10 +211,23 @@ async function callNextToken(service = 'general', staffUsername = null) {
     t => t.status === TOKEN_STATUS.WAITING && isPriorityTier(t)
   );
 
-  const previouslyCalled = tokenList.find(t => t.status === TOKEN_STATUS.CALLED && t.service === service);
+  // When a caller owns a room (OPD doctor), they only clear their own "called"
+  // token and are served their own assigned patients first, then any unassigned.
+  const mineOnly = (t) => !assignedTo || t.assignedTo === assignedTo;
+  const previouslyCalled = tokenList.find(
+    t => t.status === TOKEN_STATUS.CALLED && t.service === service && mineOnly(t)
+  );
   const waitingForService = tokenList
     .filter(t => t.status === TOKEN_STATUS.WAITING && t.service === service)
-    .sort(sortByPriorityThenNumber);
+    .filter(t => !assignedTo || t.assignedTo === assignedTo || !t.assignedTo)
+    .sort((a, b) => {
+      if (assignedTo) {
+        const am = a.assignedTo === assignedTo ? 0 : 1;
+        const bm = b.assignedTo === assignedTo ? 0 : 1;
+        if (am !== bm) return am - bm;
+      }
+      return sortByPriorityThenNumber(a, b);
+    });
 
   const next = waitingForService[0];
 

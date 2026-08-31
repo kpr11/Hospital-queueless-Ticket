@@ -76,6 +76,7 @@ export default function Layout({ children }) {
     { to: '/admin/analytics', label: 'Analytics' },
     { to: '/admin/staff', label: 'Staff' },
     { to: '/admin/reception', label: 'Reception' },
+    { to: '/admin/roster', label: 'Roster' },
     { to: '/files', label: 'Files' },
     { to: '/admin/manage', label: 'Admins' },
     { to: '/admin/audit', label: 'Activity' },

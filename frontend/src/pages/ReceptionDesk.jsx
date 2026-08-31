@@ -252,6 +252,9 @@ export default function ReceptionDesk() {
               <div className="text-sm text-graphite">
                 <div className="text-ink font-medium">{issued.patient.name}</div>
                 <div>{labelOf(issued.token.service)}{issued.token.priority === 'priority' && ' · priority'}</div>
+                {issued.token.room && (
+                  <div className="mt-1 text-ink font-medium">Room {issued.token.room}{issued.patient.assignedDoctor ? ` · ${issued.patient.assignedDoctor}` : ''}</div>
+                )}
                 <button onClick={() => window.print()} className="btn-secondary text-xs mt-2">Print</button>
                 <button onClick={() => setIssued(null)} className="btn-secondary text-xs mt-2 ml-2">Dismiss</button>
               </div>

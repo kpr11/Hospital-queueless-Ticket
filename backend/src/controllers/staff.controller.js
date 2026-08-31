@@ -24,7 +24,9 @@ async function callNext(req, res) {
   if (!service) {
     return res.status(400).json({ error: 'No service assigned to this account.' });
   }
-  const result = await queueService.callNextToken(service, req.user.sub);
+  // OPD doctors each run a room and are served their own assigned patients.
+  const assignedTo = service === 'opd' ? req.user.sub : null;
+  const result = await queueService.callNextToken(service, req.user.sub, { assignedTo });
   res.json(result);
 }
 

@@ -69,6 +69,14 @@ const refs = {
   // via the Admin SDK; never client-readable. Served only through the JWT API.
   patients: () => db.ref('hospital/patients'),
   patient: (id) => db.ref(`hospital/patients/${id}`),
+  // Daily doctor roster for a department: which doctors are on duty today, their
+  // room numbers, and their live availability. Keyed by ISO date then department.
+  roster: (date, dept) => db.ref(`hospital/roster/${date}/${dept}`),
+  rosterDoctor: (date, dept, username) => db.ref(`hospital/roster/${date}/${dept}/doctors/${username}`),
+  rosterCursor: (date, dept) => db.ref(`hospital/roster/${date}/${dept}/cursor`),
+  // Consultation records — a permanent per-patient clinical note history.
+  consultations: () => db.ref('hospital/consultations'),
+  consultation: (id) => db.ref(`hospital/consultations/${id}`),
 };
 
 module.exports = { admin, db, refs };
