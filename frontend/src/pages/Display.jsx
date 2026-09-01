@@ -65,7 +65,7 @@ export default function Display() {
   const inScope = (t) => !wanted.length || wanted.includes(t.service);
 
   return (
-    <div className="min-h-screen bg-ink text-paper flex flex-col select-none">
+    <div className="min-h-screen bg-paper text-ink flex flex-col select-none">
       {/* Announcement banner */}
       {announcement?.message && (
         <div className="px-8 py-3 bg-warn text-ink text-sm font-medium text-center tracking-wide">
@@ -75,16 +75,16 @@ export default function Display() {
 
       {/* Display message (permanent welcome message from admin settings) */}
       {cfg.displayMessage && (
-        <div className="px-8 py-2.5 border-b border-teal-500/30 bg-teal-900/20 text-teal-200 text-sm text-center tracking-wide">
+        <div className="px-8 py-2.5 border-b border-teal-200 bg-teal-50 text-teal-800 text-sm text-center tracking-wide">
           {cfg.displayMessage}
         </div>
       )}
 
       {/* Top bar */}
-      <div className="flex items-center justify-between px-8 py-5 border-b border-paper/10">
+      <div className="flex items-center justify-between px-8 py-5 border-b border-rule">
         <div>
-          <span className="text-xs tracking-[0.18em] uppercase text-paper/50">{cfg.orgName}</span>
-          <span className="ml-3 text-xs text-paper/30">
+          <span className="text-xs tracking-[0.18em] uppercase text-graphite">{cfg.orgName}</span>
+          <span className="ml-3 text-xs text-graphite/70">
             · {single ? `${single.title} — Queue Display` : 'Queue Display'}
           </span>
         </div>
@@ -98,7 +98,7 @@ export default function Display() {
               {priorityWaiting.filter(inScope).length} priority waiting
             </span>
           )}
-          <span className="font-mono text-paper/50 text-sm">{time.toLocaleTimeString()}</span>
+          <span className="font-mono text-graphite text-sm">{time.toLocaleTimeString()}</span>
         </div>
       </div>
 
@@ -117,10 +117,10 @@ export default function Display() {
               >
                 #{String(priorityCalled.number).padStart(2, '0')}
               </span>
-              <span className="text-warn/70 text-sm">{getServiceLabel(priorityCalled.service, cfg.industry)} · Now serving</span>
+              <span className="text-warn/80 text-sm">{getServiceLabel(priorityCalled.service, cfg.industry)} · Now serving</span>
             </div>
           ) : (
-            <p className="text-warn/50 text-sm">Preparing next priority patient…</p>
+            <p className="text-warn/70 text-sm">Preparing next priority patient…</p>
           )}
         </div>
       )}
@@ -152,14 +152,14 @@ export default function Display() {
                 <div
                   key={s.id}
                   className={`border p-6 flex flex-col transition-all duration-500 ${
-                    called ? 'border-accent bg-accent/10' : 'border-paper/10 bg-paper/5'
-                  } ${isFlashing ? 'scale-105' : ''}`}
+                    called ? 'border-accent bg-accent/5' : 'border-rule bg-cream'
+                  } ${isFlashing ? 'scale-105 shadow-lg' : ''}`}
                 >
-                  <div className="text-xs tracking-[0.15em] uppercase text-paper/50 mb-4">{s.title}</div>
+                  <div className="text-xs tracking-[0.15em] uppercase text-graphite mb-4">{s.title}</div>
 
                   <div
                     className={`font-display num leading-none tracking-tightest flex-1 flex items-center transition-colors ${
-                      called ? 'text-accent' : 'text-paper/20'
+                      called ? 'text-accent' : 'text-ash'
                     }`}
                     style={{ fontSize: 'clamp(4rem, 10vw, 10rem)' }}
                   >
@@ -167,14 +167,14 @@ export default function Display() {
                   </div>
 
                   {called?.note && (
-                    <div className="mt-2 text-xs text-accent/70 italic border-t border-accent/20 pt-2">
+                    <div className="mt-2 text-xs text-accent-deep italic border-t border-accent/20 pt-2">
                       {called.note}
                     </div>
                   )}
 
                   {waiting.length > 0 && (
-                    <div className="mt-3 pt-3 border-t border-paper/10 text-sm text-paper/50">
-                      <span className="text-[10px] tracking-[0.15em] uppercase text-paper/40 mr-2">Waiting</span>
+                    <div className="mt-3 pt-3 border-t border-rule text-sm text-graphite">
+                      <span className="text-[10px] tracking-[0.15em] uppercase text-graphite/70 mr-2">Waiting</span>
                       <span className="font-mono">
                         {waiting
                           .slice()
@@ -187,10 +187,10 @@ export default function Display() {
                   )}
 
                   <div className="mt-4 flex items-center justify-between text-xs">
-                    <span className={called ? 'text-accent font-medium' : 'text-paper/30'}>
+                    <span className={called ? 'text-accent font-medium' : 'text-graphite/70'}>
                       {called ? 'Now serving' : 'No one called'}
                     </span>
-                    <span className="text-paper/40">{waiting.length} waiting</span>
+                    <span className="text-graphite/70">{waiting.length} waiting</span>
                   </div>
                 </div>
               );
@@ -200,7 +200,7 @@ export default function Display() {
       )}
 
       {/* Bottom ticker */}
-      <div className="px-8 py-4 border-t border-paper/10 flex items-center justify-between text-xs text-paper/30">
+      <div className="px-8 py-4 border-t border-rule flex items-center justify-between text-xs text-graphite/70">
         <span>Scan the QR on your slip or ask staff for your token number</span>
         <span className="flex items-center gap-2">
           <span className="w-1.5 h-1.5 rounded-full bg-success animate-pulse" />
@@ -234,20 +234,20 @@ function RoomsBoard({ service, rooms, tokenList, flashId }) {
               <div
                 key={r.room}
                 className={`border p-6 flex flex-col transition-all duration-500 ${
-                  called ? 'border-accent bg-accent/10' : off ? 'border-paper/10 bg-paper/[0.03]' : 'border-paper/10 bg-paper/5'
-                } ${isFlashing ? 'scale-[1.03]' : ''}`}
+                  called ? 'border-accent bg-accent/5' : off ? 'border-rule bg-cream/50' : 'border-rule bg-cream'
+                } ${isFlashing ? 'scale-[1.03] shadow-lg' : ''}`}
               >
                 <div className="flex items-center justify-between">
-                  <span className="text-sm tracking-[0.2em] uppercase text-paper/60">Room {r.room}</span>
-                  <span className={`text-[10px] tracking-[0.15em] uppercase px-2 py-0.5 border ${off ? 'text-paper/30 border-paper/15' : 'text-success border-success/40'}`}>
+                  <span className="text-sm tracking-[0.2em] uppercase text-graphite font-medium">Room {r.room}</span>
+                  <span className={`text-[10px] tracking-[0.15em] uppercase px-2 py-0.5 border ${off ? 'text-graphite/60 border-rule' : 'text-success border-success/40'}`}>
                     {off ? 'Off' : 'In'}
                   </span>
                 </div>
-                <div className="mt-1 text-sm text-paper/40 truncate">{r.doctor}</div>
+                <div className="mt-1 text-sm text-graphite truncate">{r.doctor}</div>
 
                 <div
                   className={`font-display num leading-none tracking-tightest flex-1 flex items-center transition-colors ${
-                    called ? 'text-accent' : 'text-paper/15'
+                    called ? 'text-accent' : 'text-ash'
                   }`}
                   style={{ fontSize: 'clamp(3.5rem, 9vw, 8rem)' }}
                 >
@@ -255,10 +255,10 @@ function RoomsBoard({ service, rooms, tokenList, flashId }) {
                 </div>
 
                 <div className="flex items-center justify-between text-xs">
-                  <span className={called ? 'text-accent font-medium' : 'text-paper/30'}>
+                  <span className={called ? 'text-accent font-medium' : 'text-graphite/70'}>
                     {called ? 'Now serving' : off ? 'Room closed' : 'Ready'}
                   </span>
-                  <span className="text-paper/40">{waiting.length} waiting</span>
+                  <span className="text-graphite/70">{waiting.length} waiting</span>
                 </div>
               </div>
             );
@@ -266,8 +266,8 @@ function RoomsBoard({ service, rooms, tokenList, flashId }) {
       </div>
 
       {unassignedWaiting.length > 0 && (
-        <div className="mt-6 border border-paper/10 bg-paper/5 p-4 text-sm text-paper/50">
-          <span className="text-[10px] tracking-[0.15em] uppercase text-paper/40 mr-2">Not yet assigned</span>
+        <div className="mt-6 border border-rule bg-cream p-4 text-sm text-graphite">
+          <span className="text-[10px] tracking-[0.15em] uppercase text-graphite/70 mr-2">Not yet assigned</span>
           <span className="font-mono">
             {unassignedWaiting.sort((a, b) => a.number - b.number).slice(0, 10)
               .map(t => String(t.number).padStart(2, '0')).join('  ')}
@@ -291,39 +291,39 @@ function SingleDepartmentBoard({ service, tokenList, flashId }) {
   const isFlashing = called && flashId === called.id;
 
   return (
-    <div className="flex-1 grid lg:grid-cols-[1.6fr_1fr] gap-px bg-paper/10 m-8 border border-paper/10">
+    <div className="flex-1 grid lg:grid-cols-[1.6fr_1fr] gap-px bg-rule m-8 border border-rule">
       {/* Now serving */}
-      <div className={`bg-ink flex flex-col items-center justify-center p-10 transition-all duration-500 ${isFlashing ? 'bg-accent/10' : ''}`}>
-        <div className="text-sm tracking-[0.3em] uppercase text-paper/40">{service.title}</div>
-        <div className="mt-2 text-xs tracking-[0.25em] uppercase text-accent/80">Now serving</div>
+      <div className={`bg-cream flex flex-col items-center justify-center p-10 transition-all duration-500 ${isFlashing ? 'bg-accent/5' : ''}`}>
+        <div className="text-sm tracking-[0.3em] uppercase text-graphite">{service.title}</div>
+        <div className="mt-2 text-xs tracking-[0.25em] uppercase text-accent">Now serving</div>
         <div
-          className={`font-display num leading-none tracking-tightest ${called ? 'text-accent' : 'text-paper/15'} ${isFlashing ? 'animate-pulse' : ''}`}
+          className={`font-display num leading-none tracking-tightest ${called ? 'text-accent' : 'text-ash'} ${isFlashing ? 'animate-pulse' : ''}`}
           style={{ fontSize: 'clamp(8rem, 26vw, 22rem)' }}
         >
           {called ? String(called.number).padStart(2, '0') : '—'}
         </div>
         {called?.note && (
-          <div className="mt-4 text-lg text-accent/70 italic">{called.note}</div>
+          <div className="mt-4 text-lg text-accent-deep italic">{called.note}</div>
         )}
         {!called && (
-          <div className="mt-4 text-lg text-paper/30">Waiting for the next patient…</div>
+          <div className="mt-4 text-lg text-graphite/70">Waiting for the next patient…</div>
         )}
       </div>
 
       {/* Up next */}
-      <div className="bg-ink p-8 flex flex-col">
+      <div className="bg-cream p-8 flex flex-col">
         <div className="flex items-baseline justify-between">
-          <span className="text-xs tracking-[0.25em] uppercase text-paper/40">Up next</span>
-          <span className="text-xs text-paper/40">{waiting.length} waiting</span>
+          <span className="text-xs tracking-[0.25em] uppercase text-graphite">Up next</span>
+          <span className="text-xs text-graphite">{waiting.length} waiting</span>
         </div>
         <div className="mt-6 flex-1 flex flex-col gap-3 overflow-hidden">
           {waiting.length === 0 && (
-            <div className="text-paper/25 text-lg">No one in the queue</div>
+            <div className="text-graphite/60 text-lg">No one in the queue</div>
           )}
           {waiting.slice(0, 8).map((t, i) => (
             <div
               key={t.id}
-              className={`flex items-center justify-between border-b border-paper/10 pb-2 ${i === 0 ? 'text-paper' : 'text-paper/45'}`}
+              className={`flex items-center justify-between border-b border-rule pb-2 ${i === 0 ? 'text-ink' : 'text-graphite'}`}
             >
               <span className="font-display num tracking-tightest" style={{ fontSize: i === 0 ? '2.6rem' : '2rem' }}>
                 {String(t.number).padStart(2, '0')}
@@ -336,7 +336,7 @@ function SingleDepartmentBoard({ service, tokenList, flashId }) {
             </div>
           ))}
           {waiting.length > 8 && (
-            <div className="text-paper/30 text-sm pt-1">+ {waiting.length - 8} more</div>
+            <div className="text-graphite/60 text-sm pt-1">+ {waiting.length - 8} more</div>
           )}
         </div>
       </div>

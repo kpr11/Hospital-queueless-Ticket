@@ -141,26 +141,33 @@ async function addLabOrders(id, tests, doctorUsername) {
 }
 
 /**
- * Close the consultation and advance the doctor's room: the current called
- * token is served and the next assigned patient is called.
+ * Close the consultation, then advance the doctor's room in the background:
+ * the current called token is served and the next assigned patient is called.
+ *
+ * The queue advance is fire-and-forget — the doctor's screen updates from the
+ * live queue subscription, so it must not hold up the HTTP response (calling
+ * the next token reads every token and writes analytics, which is slow on a
+ * cold instance).
  */
 async function complete(id, { diagnosis, notes }, doctorUsername) {
-  let c = await getById(id);
+  const c = await getById(id);
   if (!c) throw bad('Consultation not found.', 404);
   if (c.doctorUsername !== doctorUsername) throw bad('Not your consultation.', 403);
-
-  if (typeof diagnosis === 'string' || typeof notes === 'string') {
-    c = await update(id, { diagnosis, notes }, doctorUsername).catch(() => c);
-  }
+  if (c.status === STATUS.COMPLETED) return { consultation: c }; // idempotent
 
   const now = Date.now();
-  await refs.consultation(id).update({ status: STATUS.COMPLETED, completedAt: now, updatedAt: now });
+  const patch = { status: STATUS.COMPLETED, completedAt: now, updatedAt: now };
+  if (typeof diagnosis === 'string') patch.diagnosis = diagnosis.slice(0, 4000);
+  if (typeof notes === 'string') patch.notes = notes.slice(0, 8000);
+  await refs.consultation(id).update(patch);
 
-  const advance = await queueService
-    .callNextToken(c.department, doctorUsername, { assignedTo: doctorUsername })
-    .catch(() => ({ called: null }));
+  setImmediate(() => {
+    queueService
+      .callNextToken(c.department, doctorUsername, { assignedTo: doctorUsername })
+      .catch((err) => console.error('[consultation] auto-advance failed (non-fatal):', err.message));
+  });
 
-  return { consultation: { ...c, status: STATUS.COMPLETED, completedAt: now }, advance };
+  return { consultation: { ...c, ...patch } };
 }
 
 module.exports = { STATUS, LAB_TESTS, openForToken, getById, historyForPatient, update, addLabOrders, complete };

@@ -29,6 +29,7 @@ export default function ConsultationPanel({ token, onCompleted }) {
   const [savedAt, setSavedAt] = useState(null);
   const [ordering, setOrdering] = useState(false);
   const [completing, setCompleting] = useState(false);
+  const [completed, setCompleted] = useState(false);
   const [err, setErr] = useState(null);
 
   useEffect(() => {
@@ -87,14 +88,16 @@ export default function ConsultationPanel({ token, onCompleted }) {
   };
 
   const complete = async () => {
-    if (!consult) return;
+    if (!consult || completing || completed) return;
     setCompleting(true);
     setErr(null);
     try {
       await apiCompleteConsultation(consult.id, { diagnosis, notes });
+      setCompleted(true);
       onCompleted?.();
     } catch (e) {
       setErr(e.response?.data?.error || 'Could not complete the consultation.');
+    } finally {
       setCompleting(false);
     }
   };
@@ -224,12 +227,20 @@ export default function ConsultationPanel({ token, onCompleted }) {
 
           {/* Done */}
           <div className="mt-5 pt-4 border-t border-rule">
-            <button onClick={complete} disabled={completing} className="btn-primary text-sm disabled:opacity-40">
-              {completing ? 'Completing…' : 'Consultation done — call next →'}
-            </button>
-            <p className="mt-2 text-xs text-graphite">
-              Closes this visit, frees the room, and calls your next patient.
-            </p>
+            {completed ? (
+              <p className="text-sm text-success font-medium">
+                Consultation completed ✓ — calling your next patient…
+              </p>
+            ) : (
+              <>
+                <button onClick={complete} disabled={completing} className="btn-primary text-sm disabled:opacity-40">
+                  {completing ? 'Completing…' : 'Consultation done — call next →'}
+                </button>
+                <p className="mt-2 text-xs text-graphite">
+                  Closes this visit, frees the room, and calls your next patient.
+                </p>
+              </>
+            )}
           </div>
         </>
       )}

@@ -31,18 +31,28 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (res) => res,
   (err) => {
-    // Only force-logout on 401 from protected routes, not public endpoints.
-    // This prevents a cold-start backend error from silently wiping the session.
+    // On a 401, clear ONLY the token that was used — localStorage is shared
+    // across tabs, so nuking both would sign a staff tab out when an admin
+    // tab's token lapses (and vice versa). Redirect only if the current page
+    // belongs to that portal.
     if (err.response?.status === 401) {
-      const url = err.config?.url || '';
-      const isProtected = url.startsWith('/admin/') || url.startsWith('/staff/');
-      if (isProtected) {
-        localStorage.removeItem(ADMIN_TOKEN_KEY);
+      const cfg = err.config || {};
+      const url = cfg.url || '';
+      const path = typeof window !== 'undefined' ? window.location.pathname : '';
+      const usedStaffToken = url.startsWith('/staff/') || cfg.staffAuth === true;
+
+      if (usedStaffToken) {
         localStorage.removeItem(STAFF_TOKEN_KEY);
-        // Hard redirect so React state resets cleanly.
-        const isStaff = url.startsWith('/staff/');
-        window.location.href = isStaff ? '/staff/login' : '/admin/login';
+        localStorage.removeItem('queueless.staffUser');
+        if (path.startsWith('/staff') || path === '/kiosk') window.location.href = '/staff/login';
+      } else if (url.startsWith('/admin/')) {
+        localStorage.removeItem(ADMIN_TOKEN_KEY);
+        localStorage.removeItem('queueless.adminUser');
+        if (path.startsWith('/admin')) window.location.href = '/admin/login';
       }
+      // 401 on a shared route (/roster, /consultations, /patients, /config …)
+      // with the admin-first fallback token: leave both sessions alone — the
+      // session watchdog and the next real /admin or /staff call handle it.
     }
     return Promise.reject(err);
   }
