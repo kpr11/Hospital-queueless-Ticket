@@ -15,11 +15,14 @@ export const TOKEN_KEY = ADMIN_TOKEN_KEY;
 
 api.interceptors.request.use((config) => {
   const url = config.url || '';
-  // Staff routes must always use the staff JWT (it carries the service claim).
-  // All other routes use the admin token first, falling back to staff token.
-  const isStaffRoute = url.startsWith('/staff/');
-  const token = isStaffRoute
-    ? localStorage.getItem(STAFF_TOKEN_KEY)
+  // Staff routes must always use the staff JWT (it carries the `service` claim).
+  // `staffAuth: true` forces the staff JWT for identity-sensitive calls that
+  // live outside the /staff/ prefix (roster availability, consultations) — so a
+  // stale admin token left in the same browser can't act as the wrong person.
+  // Everything else uses the admin token first, falling back to the staff token.
+  const forceStaff = url.startsWith('/staff/') || config.staffAuth === true;
+  const token = forceStaff
+    ? (localStorage.getItem(STAFF_TOKEN_KEY) || localStorage.getItem(ADMIN_TOKEN_KEY))
     : (localStorage.getItem(ADMIN_TOKEN_KEY) || localStorage.getItem(STAFF_TOKEN_KEY));
   if (token) config.headers.Authorization = `Bearer ${token}`;
   return config;

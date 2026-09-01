@@ -15,8 +15,9 @@ export const apiRemoveRosterDoctor = (username, department = 'opd') =>
   api.delete(`/roster/doctors/${encodeURIComponent(username)}`, { params: { department } }).then(r => r.data);
 
 // A doctor flips their own availability for today: 'available' | 'off'.
+// Identity-sensitive (keyed by the caller's username) — force the staff JWT.
 export const apiSetAvailability   = (status, department = 'opd') =>
-  api.post('/roster/availability', { status, department }).then(r => r.data);
+  api.post('/roster/availability', { status, department }, { staffAuth: true }).then(r => r.data);
 
 // Admin — move a doctor's (or 'unassigned') waiting patients to available doctors.
 export const apiReassignRoster    = (from, department = 'opd') =>

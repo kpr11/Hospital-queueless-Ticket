@@ -34,12 +34,14 @@ export const apiPendingRegistrations = (department) =>
   api.get('/patients/pending', { params: department ? { department } : {} }).then(r => r.data);
 
 // Department desk — verify Aadhaar and issue a token.
-export const apiVerifyAndIssueToken = ({ patientId, aadhaar, department }) =>
+// `opts.staffAuth` forces the staff JWT so the token is attributed to the
+// doctor doing the check-in (not a stale admin session in the same browser).
+export const apiVerifyAndIssueToken = ({ patientId, aadhaar, department }, opts = {}) =>
   api.post('/patients/verify-issue', {
     patientId: patientId || undefined,
     aadhaar: String(aadhaar || '').replace(/[\s-]/g, ''),
     department: department || undefined,
-  }).then(r => r.data);
+  }, opts).then(r => r.data);
 
 export const apiGetPatient = (id) =>
   api.get(`/patients/${id}`).then(r => r.data);

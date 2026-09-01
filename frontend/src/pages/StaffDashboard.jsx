@@ -177,7 +177,7 @@ export default function StaffDashboard() {
     setCheckinBusy(true);
     setCheckinError(null);
     try {
-      const res = await apiVerifyAndIssueToken({ aadhaar: digits, department: myService });
+      const res = await apiVerifyAndIssueToken({ aadhaar: digits, department: myService }, { staffAuth: true });
       setCheckinIssued(res);
       setCheckinAadhaar('');
       loadPending();
