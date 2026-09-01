@@ -62,7 +62,7 @@ const uniqMobile = () => '9' + String(Math.floor(Math.random() * 1e9)).padStart(
     for (const d of docs) {
       const { status } = await req('POST', '/admin/staff', {
         token: admin,
-        body: { username: d.username, password: 'smokepass123', service: 'opd', displayName: d.username.toUpperCase() },
+        body: { username: d.username, password: 'smokepass123', adminPassword: ADMIN_PASS, service: 'opd', displayName: d.username.toUpperCase() },
       });
       assert(status === 201 || status === 200, `create ${d.username}: ${status}`);
       created.staff.push(d.username);

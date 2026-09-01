@@ -21,7 +21,8 @@ export default function AdminStaff() {
   const [presence, setPresence] = useState({});
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
-  const [form, setForm] = useState({ username: '', password: '', displayName: '', service: services[0]?.id || 'general', pin: '' });
+  const [showAdd, setShowAdd] = useState(false);
+  const [form, setForm] = useState({ username: '', password: '', displayName: '', service: services[0]?.id || 'general', pin: '', adminPassword: '' });
   const [formError, setFormError] = useState(null);
   const [deleting, setDeleting] = useState(null);
 
@@ -42,15 +43,19 @@ export default function AdminStaff() {
 
   if (!user) return <Navigate to="/admin/login" replace />;
 
+  const resetForm = () => setForm({ username: '', password: '', displayName: '', service: services[0]?.id || 'general', pin: '', adminPassword: '' });
+
   const handleCreate = async (e) => {
     e.preventDefault();
     setFormError(null);
     if (!form.username || !form.password) { setFormError('Username and password are required.'); return; }
+    if (!form.adminPassword) { setFormError('Enter your admin password to confirm.'); return; }
     setCreating(true);
     try {
       const newMember = await apiCreateStaff(form);
       setMembers(m => [...m, newMember]);
-      setForm({ username: '', password: '', displayName: '', service: services[0]?.id || 'general', pin: '' });
+      resetForm();
+      setShowAdd(false);
     } catch (e) {
       setFormError(e.response?.data?.error || 'Could not create staff member.');
     } finally {
@@ -153,7 +158,24 @@ export default function AdminStaff() {
 
       {/* Create form */}
       <div className="border border-rule p-6">
-        <h2 className="font-display text-2xl mb-6">Add staff member</h2>
+        {!showAdd ? (
+          <button
+            onClick={() => { setFormError(null); setShowAdd(true); }}
+            className="btn-primary"
+          >
+            + Add staff member
+          </button>
+        ) : (
+        <>
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="font-display text-2xl">Add staff member</h2>
+          <button
+            onClick={() => { setShowAdd(false); resetForm(); setFormError(null); }}
+            className="text-xs text-graphite hover:text-ink underline"
+          >
+            Cancel
+          </button>
+        </div>
         <form onSubmit={handleCreate} className="grid sm:grid-cols-2 gap-4">
           <div>
             <label className="label block mb-1">Username</label>
@@ -208,6 +230,19 @@ export default function AdminStaff() {
             </select>
           </div>
 
+          <div className="sm:col-span-2 border-t border-rule pt-4 mt-1">
+            <label className="label block mb-1">Confirm with your admin password</label>
+            <p className="text-xs text-graphite mb-2">Required to add a staff account — re-enter the password you signed in with.</p>
+            <input
+              type="password"
+              autoComplete="off"
+              value={form.adminPassword}
+              onChange={e => setForm(f => ({ ...f, adminPassword: e.target.value }))}
+              placeholder="Your admin password"
+              className="w-full sm:max-w-sm border border-rule bg-paper px-3 py-2.5 text-sm focus:outline-none focus:border-ink"
+            />
+          </div>
+
           {formError && (
             <div className="sm:col-span-2 p-3 border border-accent bg-accent/5 text-accent-deep text-sm">{formError}</div>
           )}
@@ -218,6 +253,8 @@ export default function AdminStaff() {
             </button>
           </div>
         </form>
+        </>
+        )}
       </div>
     </div>
   );

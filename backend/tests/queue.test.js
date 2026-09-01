@@ -195,6 +195,32 @@ describe('Admin authentication', () => {
     const res = await request(app).get('/api/v1/admin/queue');
     expect(res.status).toBe(401);
   });
+
+  test('creating a staff account requires the admin to re-confirm their password', async () => {
+    const adminToken = (await request(app).post('/api/v1/auth/login')
+      .send({ username: 'admin', password: 'testpassword123' })).body.token;
+
+    // valid JWT but wrong / missing confirmation password → 401, no account created
+    const bad = await request(app).post('/api/v1/admin/staff')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ username: 'ghost', password: 'staffpass123', adminPassword: 'nope', service: 'general' });
+    expect(bad.status).toBe(401);
+
+    const missing = await request(app).post('/api/v1/admin/staff')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ username: 'ghost', password: 'staffpass123', service: 'general' });
+    expect(missing.status).toBe(401);
+
+    const ghostLogin = await request(app).post('/api/v1/staff/login')
+      .send({ username: 'ghost', password: 'staffpass123' });
+    expect(ghostLogin.status).toBe(401); // never created
+
+    // correct confirmation → created
+    const ok = await request(app).post('/api/v1/admin/staff')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ username: 'realstaff', password: 'staffpass123', adminPassword: 'testpassword123', service: 'general' });
+    expect(ok.status).toBe(201);
+  });
 });
 
 describe('Admin queue control', () => {
@@ -384,7 +410,7 @@ describe('Queue management (custom queues)', () => {
     await request(app)
       .post('/api/v1/admin/staff')
       .set('Authorization', `Bearer ${adminToken}`)
-      .send({ username: 'drcardio', password: 'staffpass123', service: 'general', displayName: 'Dr Cardio' });
+      .send({ username: 'drcardio', password: 'staffpass123', adminPassword: 'testpassword123', service: 'general', displayName: 'Dr Cardio' });
 
     const assign = await request(app)
       .put('/api/v1/admin/staff/drcardio/service')
@@ -412,7 +438,7 @@ describe('Internal messaging', () => {
     adminToken = res.body.token;
     // a staff member to chat with
     await request(app).post('/api/v1/admin/staff').set('Authorization', `Bearer ${adminToken}`)
-      .send({ username: 'agent1', password: 'staffpass123', service: 'general', displayName: 'Agent One' });
+      .send({ username: 'agent1', password: 'staffpass123', adminPassword: 'testpassword123', service: 'general', displayName: 'Agent One' });
   });
 
   test('the team directory excludes the requester', async () => {
@@ -462,7 +488,7 @@ describe('Internal messaging', () => {
       .send({ type: 'group', name: 'Private', members: ['agent1'] });
     // log in as a different staff member who is NOT a member
     await request(app).post('/api/v1/admin/staff').set('Authorization', `Bearer ${adminToken}`)
-      .send({ username: 'outsider', password: 'staffpass123', service: 'general' });
+      .send({ username: 'outsider', password: 'staffpass123', adminPassword: 'testpassword123', service: 'general' });
     const login = await request(app).post('/api/v1/staff/login').send({ username: 'outsider', password: 'staffpass123' });
     const res = await request(app)
       .get(`/api/v1/conversations/${create.body.id}/messages`)
@@ -633,7 +659,7 @@ describe('Audit log', () => {
   test('records sensitive actions and exposes them to admins', async () => {
     // Trigger an auditable action.
     await request(app).post('/api/v1/admin/staff').set('Authorization', `Bearer ${adminToken}`)
-      .send({ username: 'audit_target', password: 'staffpass123', service: 'general' });
+      .send({ username: 'audit_target', password: 'staffpass123', adminPassword: 'testpassword123', service: 'general' });
     await request(app).delete('/api/v1/admin/staff/audit_target').set('Authorization', `Bearer ${adminToken}`);
     await new Promise(r => setTimeout(r, 30)); // audit.record is fire-and-forget
 
@@ -943,7 +969,7 @@ describe('Patient registration & Aadhaar-verified token issuance', () => {
 
   test('a staff member can only issue for their own assigned counter', async () => {
     await request(app).post('/api/v1/admin/staff').set('Authorization', `Bearer ${adminToken}`)
-      .send({ username: 'opdstaff', password: 'staffpass123', service: 'opd', displayName: 'OPD Desk' });
+      .send({ username: 'opdstaff', password: 'staffpass123', adminPassword: 'testpassword123', service: 'opd', displayName: 'OPD Desk' });
     const login = await request(app).post('/api/v1/staff/login').send({ username: 'opdstaff', password: 'staffpass123' });
     const staffToken = login.body.token;
 
@@ -1019,7 +1045,7 @@ describe('OPD roster, room assignment & consultations', () => {
 
     for (const u of ['docA', 'docB']) {
       await request(app).post('/api/v1/admin/staff').set('Authorization', `Bearer ${adminToken}`)
-        .send({ username: u, password: 'staffpass123', service: 'opd', displayName: u.toUpperCase() });
+        .send({ username: u, password: 'staffpass123', adminPassword: 'testpassword123', service: 'opd', displayName: u.toUpperCase() });
     }
     drA = (await request(app).post('/api/v1/staff/login').send({ username: 'docA', password: 'staffpass123' })).body.token;
     drB = (await request(app).post('/api/v1/staff/login').send({ username: 'docB', password: 'staffpass123' })).body.token;

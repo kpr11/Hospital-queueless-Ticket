@@ -155,8 +155,11 @@ async function listStaff(req, res) {
 }
 
 async function createStaff(req, res) {
-  const { username, password, service, displayName, pin } = req.body;
+  const { username, password, service, displayName, pin, adminPassword } = req.body;
+  // Re-authorise: the caller must confirm their own admin password to add staff.
+  await authService.verifyAdminPassword(req.user.sub, adminPassword);
   const result = await staffService.createStaff({ username, password, service, displayName, pin });
+  auditService.record({ actor: req.user.sub, action: 'staff.created', target: username, meta: { service } });
   res.status(201).json(result);
 }
 

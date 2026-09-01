@@ -119,4 +119,19 @@ function verifyToken(token) {
   return jwt.verify(token, config.jwt.secret);
 }
 
-module.exports = { bootstrapAdmin, login, verifyToken, changePassword, resetPassword, getAdminProfile, updateAdminProfile };
+/**
+ * Re-check an admin's own password — used to re-authorise a sensitive action
+ * (e.g. creating a staff account) even though the request already carries a
+ * valid JWT. Throws 401 on mismatch.
+ */
+async function verifyAdminPassword(username, password) {
+  const snap = await refs.admin(username).once('value');
+  const account = snap.val();
+  const dummyHash = '$2a$10$abcdefghijklmnopqrstuuW2j7n5p9LK0L1PZmQDqfyV5bKzN6eLm';
+  const ok = await bcrypt.compare(password || '', account?.passwordHash || dummyHash);
+  if (!account || !ok) {
+    throw Object.assign(new Error('Incorrect admin password.'), { statusCode: 401 });
+  }
+}
+
+module.exports = { bootstrapAdmin, login, verifyToken, verifyAdminPassword, changePassword, resetPassword, getAdminProfile, updateAdminProfile };
