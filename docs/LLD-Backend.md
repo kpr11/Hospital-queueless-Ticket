@@ -306,10 +306,8 @@ erDiagram
         string name
         number age
         string gender
-        string mobile
+        string mobile "10-digit — the patient's ID at the desk"
         string address
-        string aadhaarHash "salted HMAC — raw never stored"
-        string aadhaarLast4
         string department
         bool priorityRequested
         string status "registered|tokenIssued|cancelled|expired"
@@ -444,18 +442,18 @@ Key invariants:
 ```mermaid
 stateDiagram-v2
     [*] --> registered : registerPatient() (self or reception)
-    registered --> tokenIssued : verifyAndIssueToken() (Aadhaar re-hash matches)
+    registered --> tokenIssued : verifyAndIssueToken() (looked up by mobile / record id)
     registered --> cancelled : cancelRegistration()
     registered --> expired : patientCleanup sweep (> registrationTtlHours)
 ```
 
-- **Aadhaar** is validated offline (12 digits, first digit 2–9, Verhoeff
-  checksum — `utils/aadhaar.js`), then stored **only** as `HMAC-SHA256(salt,
-  digits)` plus `last4`. The raw number never reaches RTDB or a response.
-- **Duplicate guard:** one `registered` record per `(aadhaarHash, department)`
-  and per `(mobile, department)` → `409`.
-- **`verifyAndIssueToken`** re-hashes the Aadhaar typed at the desk, matches it
-  to a `registered` record for that department, then:
+- **The 10-digit mobile number is the patient's ID.** No Aadhaar is collected.
+  Validated as `^[6-9]\d{9}$`.
+- **Duplicate guard:** one `registered` record per `(mobile, department)` → `409`.
+  Same mobile in a different department is allowed.
+- **`verifyAndIssueToken({ patientId?, mobile?, department })`** loads the record
+  by `patientId` (staff picked it from the pending list) or finds the
+  `registered` record by `(mobile, department)`, then:
   1. `dept === 'opd'` → `rosterService.assignRoom('opd')` (round-robin)
   2. `queueService.issueToken({ service, patientId, priority, room, assignedTo })`
   3. patient → `tokenIssued` with `room` + `assignedDoctor`
@@ -570,7 +568,6 @@ flowchart TD
 | 403 | authenticated but wrong tier/role, or not the consultation owner / wrong room |
 | 404 | token / patient / consultation / account / route not found |
 | 409 | duplicate registration, double token issue, `PRIORITY_BLOCKING`, roster conflict (wrong service, not rostered), illegal state transition |
-| 422 | Aadhaar doesn't match the registered record |
 | 423 | queue or service is paused |
 | 429 | rate limiter tripped |
 | 500 | unexpected — reported to the webhook |
@@ -582,15 +579,16 @@ flowchart TD
 - **No Firebase Auth.** All privileged data is written by the Admin SDK behind
   the JWT API; clients can only *read* the public queue nodes and *write* their
   own `presence` node.
-- Passwords + PINs: bcrypt (10 rounds). Aadhaar: salted HMAC, last-4 only.
+- Passwords + PINs: bcrypt (10 rounds). Patient PII: name, mobile, address — no
+  government IDs collected.
 - Rate limits: login (20 / 15 min), take-token (10 / min), patient register
   (5 / min), messaging assistant-style caps.
 - `helmet`, CORS allow-list from `CORS_ORIGIN`, `x-powered-by` off, `trust proxy`.
 - The patient-status endpoint (`GET /patients/:id/status`) is public but the
   `:id` is an unguessable UUID acting as a capability token; it returns first
   name + status + token/room only — no demographics.
-- Secrets (`JWT_SECRET`, `AADHAAR_SALT`, `FIREBASE_PRIVATE_KEY`, admin creds) are
-  Render environment variables, never committed.
+- Secrets (`JWT_SECRET`, `FIREBASE_PRIVATE_KEY`, admin creds) are Render
+  environment variables, never committed.
 
 ---
 

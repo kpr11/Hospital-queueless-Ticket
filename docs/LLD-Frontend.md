@@ -245,7 +245,7 @@ flowchart TD
     CP --> C3["diagnosis + notes → apiUpdateConsultation"]
     CP --> C4["test chips → apiOrderLabTests"]
     CP --> C5["'Consultation done' → apiCompleteConsultation → onCompleted()"]
-    SD --> CI["Check-in panel: apiPendingRegistrations + apiVerifyAndIssueToken (Aadhaar)"]
+    SD --> CI["Check-in panel: apiPendingRegistrations + apiVerifyAndIssueToken (mobile / list pick)"]
     SD --> CN["Call Next button → apiStaffCallNext"]
 ```
 
@@ -254,7 +254,7 @@ flowchart TD
 ```mermaid
 flowchart TD
     RD["ReceptionDesk.jsx — 3 tabs"] --> T1["Register walk-in<br/>PatientForm → apiReceptionRegisterPatient"]
-    RD --> T2["Check in & issue<br/>dept select → apiPendingRegistrations (8 s)<br/>pick patient + Aadhaar → apiVerifyAndIssueToken<br/>→ PrintableTokenSlip (room on slip)"]
+    RD --> T2["Check in & issue<br/>dept select → apiPendingRegistrations (8 s)<br/>pick patient (or type mobile) → apiVerifyAndIssueToken<br/>→ PrintableTokenSlip (room on slip)"]
     RD --> T3["All registrations<br/>apiListRegistrations (10 s) + apiRegistrationSummary<br/>edit / cancel / reprint / expand (apiGetPatient)"]
 ```
 

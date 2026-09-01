@@ -35,7 +35,7 @@ Admins and staff manage the queue from a dedicated portal with a live dashboard,
 
 **The operational workspace adds:** admin-defined custom queues, cross-counter token referral, internal team messaging (1:1 + group chat), a notification center, secure sharing with QR codes, shared files, and role-based access control — all on the free Firebase Spark plan (no Cloud Storage / Blaze required).
 
-**Hospital OPD flow:** patient registration with Aadhaar-verified token issuance, a daily doctor roster with round-robin room assignment, a per-room consultation workspace (diagnosis notes with per-patient history, lab/scan orders that auto-route to the Radiology/Lab queues), and per-room display boards.
+**Hospital OPD flow:** patient registration (the mobile number is the patient ID), token issuance at the department desk by mobile number, a daily doctor roster with round-robin room assignment, a per-room consultation workspace (diagnosis notes with per-patient history, lab/scan orders that auto-route to the Radiology/Lab queues), and per-room display boards.
 
 ---
 

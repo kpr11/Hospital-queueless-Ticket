@@ -23,9 +23,6 @@ const STATUS_STYLE = {
   expired: 'text-graphite border-rule',
 };
 
-function formatAadhaar(raw) {
-  return String(raw || '').replace(/\D/g, '').slice(0, 12).replace(/(\d{4})(?=\d)/g, '$1 ').trim();
-}
 
 export default function ReceptionDesk() {
   const { user } = useAuth();
@@ -123,7 +120,7 @@ export default function ReceptionDesk() {
   const [dept, setDept] = useState('');
   const [pending, setPending] = useState([]);
   const [selected, setSelected] = useState(null);
-  const [aadhaar, setAadhaar] = useState('');
+  const [mobile, setMobile] = useState('');
   const [issueBusy, setIssueBusy] = useState(false);
   const [issueError, setIssueError] = useState(null);
   const [issued, setIssued] = useState(null); // { token, patient }
@@ -152,12 +149,12 @@ export default function ReceptionDesk() {
     try {
       const res = await apiVerifyAndIssueToken({
         patientId: selected?.id,
-        aadhaar,
+        mobile: selected ? undefined : mobile,
         department: dept,
       });
       setIssued(res);
       setSelected(null);
-      setAadhaar('');
+      setMobile('');
       loadPending();
     } catch (e) {
       setIssueError(e.response?.data?.error || 'Could not issue a token.');
@@ -207,7 +204,7 @@ export default function ReceptionDesk() {
             <div className="font-display text-3xl tracking-tightest mt-1">{regDone.name}</div>
             <p className="mt-2 text-sm text-graphite">
               Registered for <span className="text-ink font-medium">{labelOf(regDone.department)}</span> ·
-              Aadhaar XXXX XXXX {regDone.aadhaarLast4}
+              Mobile {regDone.mobile}
             </p>
             <p className="mt-3 text-sm text-graphite">
               Send the patient to the {labelOf(regDone.department)} desk, or switch to
@@ -223,7 +220,7 @@ export default function ReceptionDesk() {
               busy={regBusy}
               error={regError}
               submitLabel="Register patient"
-              consentLabel="The patient has given verbal consent for the hospital to store their name, age, gender, mobile number, address and the last 4 digits of their Aadhaar number to manage this visit."
+              consentLabel="The patient has given verbal consent for the hospital to store their name, age, gender, mobile number and address to manage this visit."
             />
           </div>
         )
@@ -283,16 +280,16 @@ export default function ReceptionDesk() {
                 {pending.map((p) => (
                   <button
                     key={p.id}
-                    onClick={() => { setSelected(p); setAadhaar(''); setIssueError(null); setIssued(null); }}
+                    onClick={() => { setSelected(p); setMobile(''); setIssueError(null); setIssued(null); }}
                     className={`w-full text-left px-4 py-3 flex items-center justify-between gap-2 text-sm ${selected?.id === p.id ? 'bg-ink text-paper' : 'hover:bg-paper'} ${p.priorityRequested && selected?.id !== p.id ? 'bg-accent/5' : ''}`}
                   >
                     <span className="min-w-0">
                       <span className="font-medium">{p.name}</span>
                       {p.priorityRequested && <span className="ml-1.5 text-[10px] font-bold text-accent" title="Priority">P</span>}
-                      <span className={`block sm:inline sm:ml-1 ${selected?.id === p.id ? 'text-paper/60' : 'text-graphite'}`}>{p.age}/{p.gender[0].toUpperCase()} · {p.mobile}</span>
+                      <span className={`block sm:inline sm:ml-1 ${selected?.id === p.id ? 'text-paper/60' : 'text-graphite'}`}>{p.age}/{p.gender[0].toUpperCase()}</span>
                     </span>
                     <span className={`font-mono text-xs shrink-0 ${selected?.id === p.id ? 'text-paper/60' : 'text-graphite'}`}>
-                      XXXX {p.aadhaarLast4}
+                      {p.mobile}
                     </span>
                   </button>
                 ))}
@@ -302,29 +299,29 @@ export default function ReceptionDesk() {
 
           <div className="border border-accent/30 bg-accent/5 p-4 space-y-3 max-w-md">
             <span className="label block">
-              Verify Aadhaar {selected ? `for ${selected.name}` : '& issue token'}
+              {selected ? `Issue token for ${selected.name}` : 'Issue token by mobile number'}
             </span>
-            <input
-              inputMode="numeric"
-              value={formatAadhaar(aadhaar)}
-              onChange={(e) => setAadhaar(e.target.value)}
-              placeholder="#### #### ####"
-              className="w-full border border-rule bg-paper px-3 py-2.5 text-sm font-mono tracking-wider focus:outline-none focus:border-ink"
-            />
-            {selected && aadhaar.replace(/\D/g, '').length === 12 &&
-              aadhaar.replace(/\D/g, '').slice(-4) !== selected.aadhaarLast4 && (
-                <p className="text-xs text-accent-deep">Last 4 digits don't match the selected patient ({selected.aadhaarLast4}).</p>
+            {selected ? (
+              <p className="text-sm text-graphite">Patient ID: <span className="font-mono text-ink">{selected.mobile}</span></p>
+            ) : (
+              <input
+                inputMode="numeric"
+                value={mobile}
+                onChange={(e) => setMobile(e.target.value.replace(/\D/g, '').slice(0, 10))}
+                placeholder="Patient's 10-digit mobile number"
+                className="w-full border border-rule bg-paper px-3 py-2.5 text-sm font-mono tracking-wider focus:outline-none focus:border-ink"
+              />
             )}
             {issueError && <p className="text-sm text-accent-deep">{issueError}</p>}
             <button
               onClick={handleIssue}
-              disabled={issueBusy || aadhaar.replace(/\D/g, '').length !== 12}
+              disabled={issueBusy || (!selected && !/^[6-9]\d{9}$/.test(mobile))}
               className="btn-primary text-sm disabled:opacity-40"
             >
-              {issueBusy ? 'Verifying…' : 'Verify & issue token'}
+              {issueBusy ? 'Issuing…' : 'Issue token'}
             </button>
             <p className="text-xs text-graphite">
-              Pick a patient above, or just enter any registered Aadhaar number for {labelOf(dept)}.
+              Pick a patient above, or enter their registered mobile number for {labelOf(dept)}.
             </p>
           </div>
         </div>

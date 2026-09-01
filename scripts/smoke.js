@@ -16,9 +16,6 @@ const API = `${BASE}/api/v1`;
 const ADMIN_USER = process.env.ADMIN_USER || 'admin';
 const ADMIN_PASS = process.env.ADMIN_PASS || 'admin12345';
 
-// Verhoeff-valid test Aadhaar numbers.
-const AADHAAR = ['234567890124', '789456123014', '555444333229', '999888777669'];
-const pick = () => AADHAAR[Math.floor(Math.random() * AADHAAR.length)];
 
 let passed = 0;
 const results = [];
@@ -53,7 +50,6 @@ function assert(cond, msg) { if (!cond) throw new Error(msg); }
 (async () => {
   let token;
   const mobile = '9' + String(Math.floor(Math.random() * 1e9)).padStart(9, '0');
-  const aadhaar = pick();
   let patientId;
 
   await step('GET /health returns ok', async () => {
@@ -93,23 +89,23 @@ function assert(cond, msg) { if (!cond) throw new Error(msg); }
     const { status, json } = await req('POST', '/patients/register', {
       body: {
         name: 'Smoke Test', age: 40, gender: 'other', mobile,
-        address: '1 Test Rd', aadhaar, department: 'opd', consent: true,
+        address: '1 Test Rd', department: 'opd', consent: true,
       },
     });
     assert(status === 201 && json.patient?.id, `got ${status} ${JSON.stringify(json)}`);
-    assert(json.patient.aadhaarHash === undefined, 'aadhaarHash leaked in response');
+    assert(json.patient.aadhaarHash === undefined, 'aadhaarHash present on new record');
     patientId = json.patient.id;
   });
 
-  await step('public status endpoint (minimal, no secrets)', async () => {
+  await step('public status endpoint (minimal, no address)', async () => {
     const { status, json } = await req('GET', `/patients/${patientId}/status`);
     assert(status === 200 && json.status === 'registered', `got ${status} ${JSON.stringify(json)}`);
-    assert(json.mobile === undefined && json.address === undefined, 'status endpoint leaked PII');
+    assert(json.address === undefined, 'status endpoint leaked the address');
   });
 
-  await step('department desk verifies Aadhaar and issues a token', async () => {
+  await step('department desk issues a token by mobile number', async () => {
     const { status, json } = await req('POST', '/patients/verify-issue', {
-      token, body: { patientId, aadhaar, department: 'opd' },
+      token, body: { mobile, department: 'opd' },
     });
     assert(status === 201 && json.token?.number > 0 && json.token.service === 'opd', `got ${status} ${JSON.stringify(json)}`);
   });
@@ -121,10 +117,9 @@ function assert(cond, msg) { if (!cond) throw new Error(msg); }
     assert(all.some(t => t.patientId === patientId), 'issued token not found in queue');
   });
 
-  await step('wrong Aadhaar is rejected', async () => {
-    const wrong = AADHAAR.find(a => a !== aadhaar);
-    const { status } = await req('POST', '/patients/verify-issue', { token, body: { patientId, aadhaar: wrong, department: 'opd' } });
-    assert(status === 422 || status === 409, `expected 422/409, got ${status}`);
+  await step('an unknown mobile is rejected', async () => {
+    const { status } = await req('POST', '/patients/verify-issue', { token, body: { mobile: '9000000000', department: 'opd' } });
+    assert(status === 404 || status === 409, `expected 404/409, got ${status}`);
   });
 
   await step('patient endpoints reject anonymous access', async () => {

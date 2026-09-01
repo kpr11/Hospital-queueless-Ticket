@@ -1,20 +1,17 @@
 /**
- * Hospital patient registry + Aadhaar-verified token issuance.
+ * Hospital patient registry + mobile-number token issuance.
  *
  * Flow:
  *   1. registerPatient()      — entry point (self-service QR or reception desk).
  *                               Creates a patient record. Does NOT issue a token.
- *   2. verifyAndIssueToken()  — department desk (e.g. OPD). Confirms the Aadhaar
- *                               number matches the stored registration for that
- *                               department, then issues a queue token.
- *
- * Only a salted HMAC of the Aadhaar number is stored (plus the last 4 digits for
- * display). The raw number never touches RTDB and is never returned to a client.
+ *                               The 10-digit mobile number is the patient's ID.
+ *   2. verifyAndIssueToken()  — department desk (e.g. OPD). Looks up the pending
+ *                               registration by mobile number (or by the record
+ *                               id when staff picked it from the list), then
+ *                               issues a queue token for that department.
  */
 const crypto = require('crypto');
 const { refs } = require('../config/firebase');
-const config = require('../config/env');
-const { normaliseAadhaar, isValidAadhaar, last4 } = require('../utils/aadhaar');
 const queueService = require('./queue.service');
 const rosterService = require('./roster.service');
 const analytics = require('./analytics.service');
@@ -33,16 +30,12 @@ function bad(message, statusCode = 400) {
   return Object.assign(new Error(message), { statusCode });
 }
 
-function hashAadhaar(rawOrNormalised) {
-  const normalised = normaliseAadhaar(rawOrNormalised);
-  const keyMaterial = config.aadhaarSalt || config.jwt.secret;
-  return crypto.createHmac('sha256', keyMaterial).update(normalised).digest('hex');
-}
+const digitsOnly = (m) => String(m || '').replace(/\D/g, '');
 
-/** Strip server-only fields before a record leaves the API. */
+/** Drop any legacy Aadhaar fields left on old records before a record leaves the API. */
 function sanitise(patient) {
   if (!patient) return null;
-  const { aadhaarHash: _omit, ...safe } = patient;
+  const { aadhaarHash: _h, aadhaarLast4: _l, ...safe } = patient;
   return safe;
 }
 
@@ -82,7 +75,7 @@ function priorityFor(department, priorityRequested) {
 }
 
 async function registerPatient({
-  name, age, gender, mobile, address, aadhaar, department,
+  name, age, gender, mobile, address, department,
   consent, website, priorityRequested = false, priorityReason = null,
   source = 'self', registeredBy = null,
 } = {}) {
@@ -95,26 +88,20 @@ async function registerPatient({
     throw bad('Consent to store your details is required to register.');
   }
 
-  const { name: cleanName, age: numericAge, gender: cleanGender, mobile: cleanMobile, address: cleanAddress, department: cleanDept } =
+  const { name: cleanName, age: numericAge, gender: cleanGender, mobile: mob, address: cleanAddress, department: cleanDept } =
     validateDemographics({ name, age, gender, mobile, address, department });
 
-  if (!isValidAadhaar(aadhaar)) {
-    throw bad('Aadhaar number is not valid (must be 12 digits with a correct checksum).');
-  }
-
-  const normalisedAadhaar = normaliseAadhaar(aadhaar);
-  const aadhaarHash = hashAadhaar(normalisedAadhaar);
-
-  // Duplicate guard: one pending registration per (Aadhaar, department) and per
-  // (mobile, department) so a repeat submit or double-tap can't stack tokens.
+  // Duplicate guard: one pending registration per (mobile, department) so a
+  // repeat submit or double-tap can't stack tokens. The mobile number is the
+  // patient's ID at the department desk.
   const existing = await allPatients();
   const dupe = existing.find(
     p => p.status === STATUS.REGISTERED &&
          p.department === cleanDept &&
-         (p.aadhaarHash === aadhaarHash || p.mobile === cleanMobile)
+         p.mobile === mob
   );
   if (dupe) {
-    throw bad('This patient is already registered for that department and waiting for a token.', 409);
+    throw bad('This mobile number is already registered for that department and waiting for a token.', 409);
   }
 
   const id = crypto.randomUUID();
@@ -124,10 +111,8 @@ async function registerPatient({
     name: cleanName,
     age: numericAge,
     gender: cleanGender,
-    mobile: cleanMobile,
+    mobile: mob,
     address: cleanAddress,
-    aadhaarHash,
-    aadhaarLast4: last4(normalisedAadhaar),
     department: cleanDept,
     priorityRequested: priorityFor(cleanDept, priorityRequested),
     priorityReason: priorityReason ? String(priorityReason).trim().slice(0, 200) : null,
@@ -199,7 +184,7 @@ async function getRegistrationStatus(patientId) {
     id: p.id,
     firstName: String(p.name || '').split(' ')[0],
     department: p.department,
-    aadhaarLast4: p.aadhaarLast4,
+    mobile: p.mobile,
     priorityRequested: !!p.priorityRequested,
     status: p.status,
     registeredAt: p.registeredAt,
@@ -298,16 +283,14 @@ async function expireStaleRegistrations(ttlHours) {
 }
 
 /**
- * Department desk check-in: match the Aadhaar number against the stored
- * registration for `department`, then issue a queue token for that department.
+ * Department desk check-in: find the pending registration by its record id
+ * (staff picked it from the list) or by mobile number, then issue a queue
+ * token for that department.
  */
-async function verifyAndIssueToken({ patientId = null, aadhaar, department, issuedBy = null } = {}) {
+async function verifyAndIssueToken({ patientId = null, mobile = null, department, issuedBy = null } = {}) {
   const dept = String(department || '').trim();
   if (!dept) throw bad('department is required.');
-  if (!isValidAadhaar(aadhaar)) {
-    throw bad('Aadhaar number is not valid.');
-  }
-  const providedHash = hashAadhaar(aadhaar);
+  const mob = digitsOnly(mobile);
 
   let patientRecord;
   if (patientId) {
@@ -315,28 +298,31 @@ async function verifyAndIssueToken({ patientId = null, aadhaar, department, issu
     if (!snap.exists()) throw bad('Patient not found.', 404);
     patientRecord = snap.val();
   } else {
+    if (!/^[6-9]\d{9}$/.test(mob)) {
+      throw bad('Enter a valid 10-digit mobile number, or pick the patient from the list.');
+    }
     const all = await allPatients();
-    const forThisAadhaarAndDept = all.filter(
-      p => p.aadhaarHash === providedHash && p.department === dept
+    const forThisMobileAndDept = all.filter(
+      p => p.mobile === mob && p.department === dept
     );
-    patientRecord = forThisAadhaarAndDept.find(p => p.status === STATUS.REGISTERED);
+    patientRecord = forThisMobileAndDept.find(p => p.status === STATUS.REGISTERED);
     if (!patientRecord) {
-      const alreadyIssued = forThisAadhaarAndDept.find(p => p.status === STATUS.TOKEN_ISSUED);
+      const alreadyIssued = forThisMobileAndDept.find(p => p.status === STATUS.TOKEN_ISSUED);
       if (alreadyIssued) {
         throw bad(`A token (#${alreadyIssued.tokenNumber}) has already been issued to this patient.`, 409);
       }
-      throw bad('No pending registration found for this Aadhaar number at this department.', 404);
+      throw bad('No pending registration found for this mobile number at this department.', 404);
     }
   }
 
-  if (providedHash !== patientRecord.aadhaarHash) {
-    throw bad('Aadhaar does not match the registered record.', 422);
-  }
   if (patientRecord.department !== dept) {
     throw bad(`This patient registered for "${patientRecord.department}", not "${dept}".`, 409);
   }
   if (patientRecord.status === STATUS.TOKEN_ISSUED) {
     throw bad(`A token (#${patientRecord.tokenNumber}) has already been issued to this patient.`, 409);
+  }
+  if (patientRecord.status !== STATUS.REGISTERED) {
+    throw bad(`This registration is "${patientRecord.status}" and cannot be checked in.`, 409);
   }
 
   // OPD runs several consulting rooms — hand the patient to the next available
@@ -395,7 +381,6 @@ async function verifyAndIssueToken({ patientId = null, aadhaar, department, issu
 
 module.exports = {
   STATUS,
-  hashAadhaar,
   registerPatient,
   listPendingRegistrations,
   listRegistrations,

@@ -68,14 +68,14 @@ export default function RegistrationStatus() {
 
       <dl className="mt-6 border border-rule divide-y divide-rule bg-cream text-sm">
         <div className="flex justify-between px-4 py-3"><dt className="text-graphite">Department</dt><dd>{labelOf(reg.department)}</dd></div>
-        <div className="flex justify-between px-4 py-3"><dt className="text-graphite">Aadhaar on file</dt><dd className="font-mono">XXXX XXXX {reg.aadhaarLast4}</dd></div>
+        <div className="flex justify-between px-4 py-3"><dt className="text-graphite">Patient ID (mobile)</dt><dd className="font-mono">{reg.mobile}</dd></div>
         <div className="flex justify-between px-4 py-3"><dt className="text-graphite">Registered</dt><dd>{new Date(reg.registeredAt).toLocaleString()}</dd></div>
       </dl>
 
       {reg.status === 'registered' && (
         <p className="mt-6 text-sm text-graphite">
           Go to the <span className="font-medium text-ink">{labelOf(reg.department)}</span> desk and give your
-          Aadhaar number. This page updates automatically once your token is issued.
+          mobile number. This page updates automatically once your token is issued.
         </p>
       )}
       {reg.status === 'tokenIssued' && reg.tokenId && (

@@ -1,7 +1,7 @@
 import { api } from './client.js';
 
 /**
- * Hospital patient registration + Aadhaar-verified token issuance.
+ * Hospital patient registration + mobile-number token issuance.
  *
  * `apiRegisterPatient` is public (self-service QR). The rest require an
  * admin/staff JWT — the request interceptor attaches it automatically.
@@ -11,9 +11,8 @@ const buildPayload = (form) => ({
   name: form.name?.trim(),
   age: Number(form.age),
   gender: form.gender,
-  mobile: String(form.mobile || '').replace(/[\s-]/g, ''),
+  mobile: String(form.mobile || '').replace(/\D/g, ''),
   address: form.address?.trim(),
-  aadhaar: String(form.aadhaar || '').replace(/[\s-]/g, ''),
   department: form.department,
   priorityRequested: form.priorityRequested === true,
   priorityReason: form.priorityReason || undefined,
@@ -33,13 +32,13 @@ export const apiReceptionRegisterPatient = (form) =>
 export const apiPendingRegistrations = (department) =>
   api.get('/patients/pending', { params: department ? { department } : {} }).then(r => r.data);
 
-// Department desk — verify Aadhaar and issue a token.
+// Department desk — look up by mobile number (or record id) and issue a token.
 // `opts.staffAuth` forces the staff JWT so the token is attributed to the
 // doctor doing the check-in (not a stale admin session in the same browser).
-export const apiVerifyAndIssueToken = ({ patientId, aadhaar, department }, opts = {}) =>
+export const apiVerifyAndIssueToken = ({ patientId, mobile, department }, opts = {}) =>
   api.post('/patients/verify-issue', {
     patientId: patientId || undefined,
-    aadhaar: String(aadhaar || '').replace(/[\s-]/g, ''),
+    mobile: mobile ? String(mobile).replace(/\D/g, '') : undefined,
     department: department || undefined,
   }, opts).then(r => r.data);
 

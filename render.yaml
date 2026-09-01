@@ -33,8 +33,6 @@ services:
       # --- secrets: set these in the Render dashboard (Environment tab) ---
       - key: JWT_SECRET
         sync: false          # node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"
-      - key: AADHAAR_SALT
-        sync: false          # node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
       - key: ADMIN_USERNAME
         sync: false
       - key: ADMIN_PASSWORD

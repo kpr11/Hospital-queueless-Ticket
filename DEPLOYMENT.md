@@ -1,6 +1,6 @@
 # Deploying to production
 
-Hospital / Aadhaar-registration build. Read **Blockers** before exposing anything publicly.
+Hospital OPD build. Read **Blockers** before exposing anything publicly.
 
 Replace `<PROJECT_ID>` below with your Firebase project id, and
 `<BACKEND_URL>` / `<FRONTEND_URL>` with the deployed URLs.
@@ -53,19 +53,15 @@ Fresh values in the **deployed backend env** — never reuse the dev `.env`:
 
 ```bash
 node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"  # JWT_SECRET
-node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"  # AADHAAR_SALT
 ```
 
 Also set a strong `ADMIN_PASSWORD` and change it again in-app after first login.
-`AADHAAR_SALT` invalidates every stored patient-record hash when changed — set it
-once, before go-live.
 
-### 3. Legal review for Aadhaar handling
+### 3. Patient data review
 
-Storing even a hash + last 4 digits of an Aadhaar number in India is governed by
-the Aadhaar Act / UIDAI rules. Get the consent wording reviewed and a
-data-retention policy in place, or switch identity verification to a
-hospital-issued patient ID (MRN). **Not a code task; don't skip it.**
+The patient registry stores name, age, gender, mobile number and address. Get
+the consent wording and a data-retention policy reviewed before go-live. **Not a
+code task; don't skip it.**
 
 ---
 
@@ -75,7 +71,7 @@ hospital-issued patient ID (MRN). **Not a code task; don't skip it.**
    is auto-detected (builds `backend/` with `npm ci`, starts `node src/server.js`,
    health check `/api/v1/health`).
 2. In the service's **Environment** tab set every `sync: false` var from
-   `render.yaml`: `JWT_SECRET`, `AADHAAR_SALT`, `ADMIN_USERNAME`, `ADMIN_PASSWORD`,
+   `render.yaml`: `JWT_SECRET`, `ADMIN_USERNAME`, `ADMIN_PASSWORD`,
    `FIREBASE_PROJECT_ID`, `FIREBASE_CLIENT_EMAIL`, `FIREBASE_PRIVATE_KEY`
    (paste with the literal `\n`, wrapped in quotes), `FIREBASE_DATABASE_URL`,
    `CORS_ORIGIN` = `<FRONTEND_URL>`, `FRONTEND_URL` = `<FRONTEND_URL>`.

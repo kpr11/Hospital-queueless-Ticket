@@ -29,22 +29,22 @@ Auth tiers: **public** · **staff** (staff or any admin tier) ·
 
 ## Hospital patients (Medical industry)
 
-Two-step flow: **register** the patient, then the department desk **verifies the
-Aadhaar number and issues a token**. Only a salted HMAC of the Aadhaar plus the
-last 4 digits are stored — the raw number is never persisted or returned.
+Two-step flow: **register** the patient, then the department desk **looks them up
+by mobile number and issues a token**. The 10-digit mobile number is the
+patient's ID. No Aadhaar is collected or stored.
 
 | Method | Endpoint | Auth | Description |
 |--------|----------|------|-------------|
-| POST | `/patients/register` | public (rate-limited 5/min) | Self-service registration. Body: `{name, age, gender, mobile, address, aadhaar, department, consent:true, priorityRequested?, priorityReason?}`. `consent` is required; a hidden `website` honeypot field must be empty. |
+| POST | `/patients/register` | public (rate-limited 5/min) | Self-service registration. Body: `{name, age, gender, mobile, address, department, consent:true, priorityRequested?, priorityReason?}`. `consent` is required; a hidden `website` honeypot field must be empty. One pending registration per `(mobile, department)`. |
 | POST | `/patients/reception/register` | staff | Same body — reception registering a walk-in. |
-| GET | `/patients/:id/status` | public | Minimal status for the confirmation-QR page: `{firstName, department, aadhaarLast4, status, tokenNumber?}`. The id is an unguessable UUID capability. |
+| GET | `/patients/:id/status` | public | Minimal status for the confirmation-QR page: `{firstName, department, mobile, status, tokenNumber?, room?}`. The id is an unguessable UUID capability. |
 | GET | `/patients/pending?department=` | staff | Pending (not-yet-checked-in) registrations for a department. Staff are locked to their own counter. |
 | GET | `/patients/registrations?status=&department=&limit=` | staff | All registrations, newest first. |
 | GET | `/patients/summary?department=` | staff | Today's counts `{registered, tokenIssued, cancelled, expired, total}`. |
 | GET | `/patients/:id` | staff | Full record + linked token status & referral trail. |
 | PUT | `/patients/:id` | staff | Edit demographics / priority on a *pending* registration. |
 | POST | `/patients/:id/cancel` | staff | Cancel a pending registration. |
-| POST | `/patients/verify-issue` | staff | Body: `{aadhaar, department?, patientId?}`. On an Aadhaar match, issues a token for the department (priority if the department is `emergency` or priority was requested). 422 on mismatch, 404 if no pending registration, 409 if already issued. |
+| POST | `/patients/verify-issue` | staff | Body: `{mobile, department?, patientId?}` (one of `mobile` / `patientId` required). Looks up the pending registration and issues a token for the department (priority if `emergency` or priority was requested; OPD also assigns a room). 404 if no pending registration, 409 if already issued. |
 
 Stale `registered` records are auto-marked `expired` after
 `PATIENT_REGISTRATION_TTL_HOURS` (default 12) by a background sweeper.

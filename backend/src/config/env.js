@@ -51,11 +51,6 @@ const envSchema = Joi.object({
 
   // Frontend URL used to generate token tracking links in emails
   FRONTEND_URL: Joi.string().uri().default('http://localhost:5173'),
-
-  // Keying material for hashing Aadhaar numbers (HMAC-SHA256). Optional — falls
-  // back to JWT_SECRET. Set a dedicated value so rotating the JWT secret does
-  // not orphan every stored patient record.
-  AADHAAR_SALT: Joi.string().allow('').optional(),
 }).unknown(true);
 
 const { value: env, error } = envSchema.validate(process.env, { abortEarly: false });
@@ -138,6 +133,4 @@ module.exports = {
   },
 
   frontendUrl: env.FRONTEND_URL,
-
-  aadhaarSalt: env.AADHAAR_SALT || null,
 };

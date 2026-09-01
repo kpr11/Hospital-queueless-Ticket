@@ -14,8 +14,6 @@ const API = `${BASE}/api/v1`;
 const ADMIN_USER = process.env.ADMIN_USER || 'admin';
 const ADMIN_PASS = process.env.ADMIN_PASS || 'admin12345';
 
-const AADHAAR = ['234567890124', '789456123014', '555444333229', '999888777669'];
-
 let passed = 0;
 const results = [];
 const created = { staff: [], patients: [], tokens: new Set(), rosterDoctors: [] };
@@ -108,12 +106,11 @@ const uniqMobile = () => '9' + String(Math.floor(Math.random() * 1e9)).padStart(
   await step('register 3 OPD patients', async () => {
     for (let i = 0; i < 3; i++) {
       const mobile = uniqMobile();
-      const aadhaar = AADHAAR[i % AADHAAR.length];
       const { status, json } = await req('POST', '/patients/register', {
-        body: { name: `Smoke OPD ${i + 1}`, age: 30 + i, gender: 'other', mobile, address: '1 Test Rd', aadhaar, department: 'opd', consent: true },
+        body: { name: `Smoke OPD ${i + 1}`, age: 30 + i, gender: 'other', mobile, address: '1 Test Rd', department: 'opd', consent: true },
       });
       assert(status === 201 && json.patient?.id, `register ${i}: ${status} ${JSON.stringify(json)}`);
-      patients.push({ id: json.patient.id, aadhaar, mobile });
+      patients.push({ id: json.patient.id, mobile });
       created.patients.push(json.patient.id);
     }
   });
@@ -121,7 +118,7 @@ const uniqMobile = () => '9' + String(Math.floor(Math.random() * 1e9)).padStart(
   await step('verify-issue assigns rooms round-robin (901,902,901)', async () => {
     const rooms = [];
     for (const p of patients) {
-      const { status, json } = await req('POST', '/patients/verify-issue', { token: admin, body: { patientId: p.id, aadhaar: p.aadhaar, department: 'opd' } });
+      const { status, json } = await req('POST', '/patients/verify-issue', { token: admin, body: { mobile: p.mobile, department: 'opd' } });
       assert(status === 201, `issue ${p.id}: ${status} ${JSON.stringify(json)}`);
       p.tokenId = json.token.id;
       p.room = json.token.room;

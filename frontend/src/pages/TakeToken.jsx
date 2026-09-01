@@ -80,7 +80,7 @@ export default function TakeToken() {
         <div className="mb-8 p-4 border border-accent bg-accent/5 text-accent-deep text-sm">
           Here for a hospital visit?{' '}
           <Link to="/register" className="underline font-medium">Register your details first →</Link>{' '}
-          Your token is issued at the department desk after an Aadhaar check.
+          Your token is issued at the department desk — just give your mobile number.
         </div>
       )}
 

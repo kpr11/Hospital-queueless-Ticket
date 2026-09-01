@@ -264,7 +264,7 @@ python run_pipeline.py
 | `http://localhost:5173/register` | Patient registration (Medical / Hospital industry) |
 | `http://localhost:5173/display` | TV display board (fullscreen) |
 | `http://localhost:5173/admin/login` | Admin login |
-| `http://localhost:5173/admin/reception` | Reception desk — register walk-ins, verify Aadhaar, issue tokens |
+| `http://localhost:5173/admin/reception` | Reception desk — register walk-ins, issue tokens by mobile number |
 | `http://localhost:5173/staff/login` | Staff login |
 | `http://localhost:5173/kiosk` | PIN kiosk (fullscreen) |
 | `http://localhost:4000/api/v1/health` | Backend health check |
@@ -274,14 +274,15 @@ python run_pipeline.py
 1. Admin → **Settings** → Industry Type = **Medical / Hospital**. This seeds the
    department queues automatically (or use "+ … defaults" on **Queues**).
 2. Patient registers at `/register` (or the reception desk registers them at
-   `/admin/reception`): name, age, gender, mobile, address, Aadhaar, department.
-   Only a salted hash + the last 4 Aadhaar digits are stored.
+   `/admin/reception`): name, age, gender, mobile, address, department.
+   The 10-digit mobile number is the patient's ID.
 3. At the department desk (`/admin/reception` → *Check in & issue token*, or the
-   staff dashboard), the operator enters the Aadhaar number. On a match a token
-   is issued for that department and appears on `/display`.
+   staff dashboard), the operator picks the patient from the pending list or
+   types their mobile number. A token is issued for that department (OPD also
+   assigns a room) and appears on `/display`.
 
-New backend env (see `.env.example`): `AADHAAR_SALT` (optional, keep stable),
-`PATIENT_REGISTRATION_TTL_HOURS` (stale registrations auto-expire).
+New backend env (see `.env.example`): `PATIENT_REGISTRATION_TTL_HOURS`
+(stale registrations auto-expire).
 
 ---
 

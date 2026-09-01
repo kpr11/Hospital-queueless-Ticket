@@ -59,7 +59,7 @@ const refs = {
   announcement: () => db.ref('queue/announcement'),
   appointments: () => db.ref('appointments'),
   appointment: (id) => db.ref(`appointments/${id}`),
-  // Hospital patient registry — PII (demographics + Aadhaar hash). Backend-only
+  // Hospital patient registry — PII (name, mobile, address, …). Backend-only
   // via the Admin SDK; never client-readable. Served only through the JWT API.
   patients: () => db.ref('hospital/patients'),
   patient: (id) => db.ref(`hospital/patients/${id}`),

@@ -44,8 +44,7 @@ export function PrintableRegistration({ patient, departmentLabel, orgName, locat
   if (!patient) return null;
   const rows = [
     ['Department', departmentLabel],
-    ['Aadhaar', `XXXX XXXX ${patient.aadhaarLast4}`],
-    ['Mobile', patient.mobile],
+    ['Patient ID (mobile)', patient.mobile],
     ['Registered', new Date(patient.registeredAt).toLocaleString()],
   ];
   if (patient.priorityRequested) rows.push(['Priority', 'Yes']);
@@ -56,7 +55,7 @@ export function PrintableRegistration({ patient, departmentLabel, orgName, locat
       kicker="Visit registration"
       big={patient.name}
       rows={rows}
-      footer={`Go to the ${departmentLabel} desk and give your Aadhaar number to collect your token.`}
+      footer={`Go to the ${departmentLabel} desk and give your mobile number to collect your token.`}
     />
   );
 }

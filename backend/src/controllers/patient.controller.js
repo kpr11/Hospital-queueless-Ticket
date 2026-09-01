@@ -18,7 +18,7 @@ async function register(req, res) {
     source: 'self',
     registeredBy: null,
   });
-  res.status(201).json({ message: 'Registered. Proceed to the department desk with your Aadhaar number.', patient });
+  res.status(201).json({ message: 'Registered. Give your mobile number at the department desk to collect your token.', patient });
 }
 
 // requireStaff — reception desk registering a walk-in on the patient's behalf.
@@ -75,7 +75,7 @@ async function cancel(req, res) {
   res.json({ message: 'Registration cancelled.', patient });
 }
 
-// requireStaff — the department check-in: verify Aadhaar, issue a token.
+// requireStaff — the department check-in: look up by mobile / record id, issue a token.
 async function verifyAndIssue(req, res) {
   const department = resolveDepartment(req, req.body.department);
   if (!department) {
@@ -83,7 +83,7 @@ async function verifyAndIssue(req, res) {
   }
   const result = await patientService.verifyAndIssueToken({
     patientId: req.body.patientId || null,
-    aadhaar: req.body.aadhaar,
+    mobile: req.body.mobile || null,
     department,
     issuedBy: req.user.sub,
   });

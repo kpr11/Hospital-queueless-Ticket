@@ -25,10 +25,10 @@ export default function StaffDashboard() {
   const [referReason, setReferReason] = useState('');
   const [referBusy, setReferBusy] = useState(false);
 
-  // Patient check-in (Aadhaar verify → issue token) — hospital industry only.
+  // Patient check-in (look up by mobile → issue token) — hospital industry only.
   const [showCheckin, setShowCheckin] = useState(false);
   const [pendingPatients, setPendingPatients] = useState([]);
-  const [checkinAadhaar, setCheckinAadhaar] = useState('');
+  const [checkinMobile, setCheckinMobile] = useState('');
   const [checkinBusy, setCheckinBusy] = useState(false);
   const [checkinError, setCheckinError] = useState(null);
   const [checkinIssued, setCheckinIssued] = useState(null);
@@ -171,15 +171,18 @@ export default function StaffDashboard() {
     }
   };
 
-  const handleCheckinIssue = async () => {
-    const digits = checkinAadhaar.replace(/\D/g, '');
-    if (digits.length !== 12) return;
+  const handleCheckinIssue = async (patientId = null) => {
+    const digits = checkinMobile.replace(/\D/g, '');
+    if (!patientId && !/^[6-9]\d{9}$/.test(digits)) return;
     setCheckinBusy(true);
     setCheckinError(null);
     try {
-      const res = await apiVerifyAndIssueToken({ aadhaar: digits, department: myService }, { staffAuth: true });
+      const res = await apiVerifyAndIssueToken(
+        { patientId: patientId || undefined, mobile: patientId ? undefined : digits, department: myService },
+        { staffAuth: true },
+      );
       setCheckinIssued(res);
-      setCheckinAadhaar('');
+      setCheckinMobile('');
       loadPending();
     } catch (e) {
       setCheckinError(e.response?.data?.error || 'Could not issue a token.');
@@ -406,7 +409,7 @@ export default function StaffDashboard() {
         />
       )}
 
-      {/* Patient check-in — verify Aadhaar, issue token (hospital only) */}
+      {/* Patient check-in — look up by mobile, issue token (hospital only) */}
       {isMedical && (
         <div className="mb-4 border border-rule bg-cream">
           <button
@@ -436,13 +439,19 @@ export default function StaffDashboard() {
               ) : (
                 <div className="border border-rule divide-y divide-rule">
                   {pendingPatients.map(p => (
-                    <div key={p.id} className={`px-3 py-2 flex items-center justify-between text-xs ${p.priorityRequested ? 'bg-accent/5' : ''}`}>
-                      <span>
+                    <div key={p.id} className={`px-3 py-2 flex items-center justify-between gap-2 text-xs ${p.priorityRequested ? 'bg-accent/5' : ''}`}>
+                      <span className="min-w-0">
                         <span className="font-medium text-ink">{p.name}</span>
                         {p.priorityRequested && <span className="ml-1.5 text-accent font-bold" title="Priority">P</span>}
-                        <span className="text-graphite"> · {p.age}/{p.gender[0].toUpperCase()} · {p.mobile}</span>
+                        <span className="text-graphite"> · {p.age}/{p.gender[0].toUpperCase()} · <span className="font-mono">{p.mobile}</span></span>
                       </span>
-                      <span className="font-mono text-graphite">XXXX {p.aadhaarLast4}</span>
+                      <button
+                        onClick={() => handleCheckinIssue(p.id)}
+                        disabled={checkinBusy}
+                        className="btn-primary text-[11px] px-2 py-1 shrink-0 disabled:opacity-40"
+                      >
+                        Issue
+                      </button>
                     </div>
                   ))}
                 </div>
@@ -451,17 +460,17 @@ export default function StaffDashboard() {
               <div className="flex gap-2">
                 <input
                   inputMode="numeric"
-                  value={checkinAadhaar.replace(/\D/g, '').slice(0, 12).replace(/(\d{4})(?=\d)/g, '$1 ').trim()}
-                  onChange={e => setCheckinAadhaar(e.target.value)}
-                  placeholder="Enter patient's Aadhaar #### #### ####"
+                  value={checkinMobile}
+                  onChange={e => setCheckinMobile(e.target.value.replace(/\D/g, '').slice(0, 10))}
+                  placeholder="Or enter patient's 10-digit mobile"
                   className="flex-1 border border-rule bg-paper px-3 py-2 text-sm font-mono tracking-wider focus:outline-none focus:border-ink"
                 />
                 <button
-                  onClick={handleCheckinIssue}
-                  disabled={checkinBusy || checkinAadhaar.replace(/\D/g, '').length !== 12}
+                  onClick={() => handleCheckinIssue()}
+                  disabled={checkinBusy || !/^[6-9]\d{9}$/.test(checkinMobile)}
                   className="btn-primary text-xs px-3 disabled:opacity-40"
                 >
-                  {checkinBusy ? '…' : 'Verify & issue'}
+                  {checkinBusy ? '…' : 'Issue token'}
                 </button>
               </div>
               {checkinError && <p className="text-xs text-accent-deep">{checkinError}</p>}

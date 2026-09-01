@@ -29,7 +29,6 @@ const demographicsSchema = {
 
 const registerSchema = Joi.object({
   ...demographicsSchema,
-  aadhaar: Joi.string().trim().min(12).max(19).required(),
   consent: Joi.boolean().truthy('true').valid(true).required()
     .messages({ 'any.only': 'Consent to store your details is required to register.' }),
   priorityRequested: Joi.boolean().truthy('true').falsy('false').default(false),
@@ -51,9 +50,10 @@ const updateSchema = Joi.object({
 
 const verifyIssueSchema = Joi.object({
   patientId: Joi.string().uuid().optional().allow('', null),
-  aadhaar: Joi.string().trim().min(12).max(19).required(),
+  mobile: Joi.string().trim().pattern(/^[6-9]\d{9}$/).optional().allow('', null)
+    .messages({ 'string.pattern.base': 'mobile must be a valid 10-digit Indian number.' }),
   department: Joi.string().trim().min(1).max(50).optional().allow('', null),
-});
+}).or('patientId', 'mobile');
 
 const idParamSchema = Joi.object({ id: Joi.string().uuid().required() });
 

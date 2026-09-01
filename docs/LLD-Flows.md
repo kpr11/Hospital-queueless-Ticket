@@ -199,7 +199,7 @@ is a sub-queue.
 
 ```mermaid
 flowchart LR
-    R["1. Register<br/>(self QR or reception)"] --> CI["2. Check in at desk<br/>Aadhaar verified"]
+    R["1. Register<br/>(self QR or reception)<br/>mobile = patient ID"] --> CI["2. Check in at desk<br/>pick from list or type mobile"]
     CI --> AR["3. Round-robin<br/>room assignment<br/>P1→R1 P2→R2 … P6→R1"]
     AR --> CALL["4. Doctor calls next<br/>(their own patients first)"]
     CALL --> CONS["5. Consultation<br/>diagnosis · notes"]
@@ -221,32 +221,28 @@ sequenceDiagram
     participant RT as POST /patients/register  ·  POST /patients/reception/register
     participant PC as patient.controller
     participant PS as patient.service.registerPatient
-    participant AAD as utils/aadhaar (Verhoeff)
     participant DB as RTDB hospital/patients/{id}
     participant EV as events/bus
 
-    P->>FE: name, age, gender, mobile, address, Aadhaar, department, consent
+    P->>FE: name, age, gender, mobile, address, department, consent
     FE->>RT: POST (public route is rate-limited, reception route needs staff JWT)
-    RT->>RT: validate(registerSchema)  — honeypot 'website' must be empty
+    RT->>RT: validate(registerSchema)  — mobile is ^[6-9]\d{9}$, honeypot 'website' empty
     RT->>PC: register / receptionRegister
     PC->>PS: registerPatient({ …, source, registeredBy })
     PS->>PS: consent === true ?  (else 400)
-    PS->>AAD: isValidAadhaar(raw)  — 12 digits, first 2-9, Verhoeff checksum
-    AAD-->>PS: ok  (else 400)
-    PS->>PS: aadhaarHash = HMAC-SHA256(AADHAAR_SALT, digits) plus last4
     PS->>DB: read all patients — duplicate guard
-    alt existing 'registered' for (aadhaarHash|mobile, department)
+    alt existing 'registered' for (mobile, department)
         PS-->>P: 409 "already registered for that department"
     else ok
-        PS->>DB: set({ id, …, aadhaarHash, aadhaarLast4, status:'registered', tokenId:null })
+        PS->>DB: set({ id, name, mobile, address, …, status:'registered', tokenId:null })
         PS-)EV: emit(PATIENT_REGISTERED)  — notification.service fans out
-        PS-->>PC: sanitised record (no aadhaarHash)
-        PC-->>P: 201 { patient }  — go to the department desk with your Aadhaar
+        PS-->>PC: record
+        PC-->>P: 201 { patient }  — give your mobile number at the department desk
     end
 ```
 
-The raw Aadhaar number is **never** stored or returned. `hospital/**` is
-`.read: false` in the DB rules — the patient record is only ever served through
+`hospital/**` is `.read: false` in the DB rules — the patient record is only
+ever served through
 the JWT API.
 
 ### 3.2 Daily roster setup
@@ -301,15 +297,14 @@ sequenceDiagram
     participant PAT as RTDB hospital/patients/{id}
     participant DISP as Display board (Firebase onValue)
 
-    RC->>FE: pick patient from pending list + type the patient's 12-digit Aadhaar
-    FE->>RT: POST { patientId, aadhaar, department }
+    RC->>FE: pick patient from the pending list  (or type their 10-digit mobile)
+    FE->>RT: POST { patientId | mobile, department }
     RT->>PC: verifyAndIssue
     PC->>PC: resolveDepartment()  — admin uses body value, staff uses req.user.service
-    PC->>PS: verifyAndIssueToken({ patientId, aadhaar, department, issuedBy })
-    PS->>PS: isValidAadhaar(aadhaar), providedHash = HMAC(salt, digits)
-    PS->>PAT: load patient (by id, or scan by hash+dept)
-    alt hash mismatch
-        PS-->>RC: 422 "Aadhaar does not match the registered record"
+    PC->>PS: verifyAndIssueToken({ patientId, mobile, department, issuedBy })
+    PS->>PAT: load patient (by id, or find registered by mobile+dept)
+    alt no pending registration
+        PS-->>RC: 404 "No pending registration found for this mobile number"
     else already tokenIssued
         PS-->>RC: 409 "A token (#N) has already been issued"
     else ok
@@ -625,7 +620,6 @@ Backend services produce these by throwing `Object.assign(new Error(msg), { stat
 | 409 | — | second `verify-issue` for same patient | "A token (#N) has already been issued" |
 | 409 | `PRIORITY_BLOCKING` | `callNextToken` with priority waiting | "Please serve all priority tokens first" |
 | 409 | — | roster: wrong service / not rostered | "… is assigned to 'x', not 'opd'." / "You are not on today's roster." |
-| 422 | — | Aadhaar hash mismatch at check-in | "Aadhaar does not match the registered record" |
 | 423 | — | queue or service paused | "Queue is currently paused." |
 | 429 | — | rate limiter | "Too many … Please slow down." |
 | 500 | — | unexpected | "Internal server error." — also sent to `ERROR_WEBHOOK_URL` |

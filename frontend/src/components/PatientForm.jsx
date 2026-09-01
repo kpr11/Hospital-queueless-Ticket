@@ -2,16 +2,10 @@ import { useState } from 'react';
 import { useQueues } from '../hooks/useQueues.js';
 
 export const EMPTY_PATIENT_FORM = {
-  name: '', age: '', gender: '', mobile: '', address: '', aadhaar: '', department: '',
+  name: '', age: '', gender: '', mobile: '', address: '', department: '',
   priorityRequested: false, priorityReason: '',
   consent: false, website: '',
 };
-
-/** Format a raw Aadhaar string as "#### #### ####" while typing. */
-function formatAadhaar(raw) {
-  const digits = String(raw || '').replace(/\D/g, '').slice(0, 12);
-  return digits.replace(/(\d{4})(?=\d)/g, '$1 ').trim();
-}
 
 const field =
   'mt-1 w-full border border-rule bg-cream px-4 py-3 text-sm text-ink placeholder:text-graphite/50 focus:outline-none focus:border-ink';
@@ -25,14 +19,12 @@ export default function PatientForm({ onSubmit, busy, error, submitLabel = 'Regi
   const [form, setForm] = useState(EMPTY_PATIENT_FORM);
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
 
-  const aadhaarDigits = form.aadhaar.replace(/\D/g, '');
   const complete =
     form.name.trim().length >= 2 &&
     form.age !== '' &&
     form.gender &&
     /^[6-9]\d{9}$/.test(form.mobile.replace(/\D/g, '')) &&
     form.address.trim().length >= 1 &&
-    aadhaarDigits.length === 12 &&
     form.department &&
     form.consent === true;
 
@@ -43,7 +35,6 @@ export default function PatientForm({ onSubmit, busy, error, submitLabel = 'Regi
     if (!complete || busy) return;
     onSubmit({
       ...form,
-      aadhaar: aadhaarDigits,
       mobile: form.mobile.replace(/\D/g, ''),
       priorityRequested: form.priorityRequested || isEmergency,
       priorityReason: (form.priorityRequested && form.priorityReason.trim()) || null,
@@ -55,7 +46,7 @@ export default function PatientForm({ onSubmit, busy, error, submitLabel = 'Regi
     <form onSubmit={submit} className="space-y-5">
       <label className="block">
         <span className="label">Full name *</span>
-        <input value={form.name} onChange={set('name')} maxLength={100} placeholder="As per Aadhaar" className={field} />
+        <input value={form.name} onChange={set('name')} maxLength={100} placeholder="As per hospital records" className={field} />
       </label>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
@@ -82,8 +73,11 @@ export default function PatientForm({ onSubmit, busy, error, submitLabel = 'Regi
         <input
           type="tel" inputMode="numeric" value={form.mobile}
           onChange={(e) => setForm((f) => ({ ...f, mobile: e.target.value.replace(/\D/g, '').slice(0, 10) }))}
-          placeholder="10-digit number" className={field}
+          placeholder="10-digit number" className={`${field} font-mono tracking-wider`}
         />
+        <span className="mt-1 block text-xs text-graphite">
+          This is your patient ID — give it at the department desk to collect your token.
+        </span>
       </label>
 
       <label className="block">
@@ -92,18 +86,6 @@ export default function PatientForm({ onSubmit, busy, error, submitLabel = 'Regi
           value={form.address} onChange={set('address')} rows={2} maxLength={300}
           placeholder="House / street / city" className={`${field} resize-none`}
         />
-      </label>
-
-      <label className="block">
-        <span className="label">Aadhaar number *</span>
-        <input
-          inputMode="numeric" value={formatAadhaar(form.aadhaar)}
-          onChange={(e) => setForm((f) => ({ ...f, aadhaar: e.target.value }))}
-          placeholder="#### #### ####" className={`${field} font-mono tracking-wider`}
-        />
-        <span className="mt-1 block text-xs text-graphite">
-          Used only to confirm your identity at the department desk. Only the last 4 digits are stored.
-        </span>
       </label>
 
       <label className="block">
@@ -167,9 +149,8 @@ export default function PatientForm({ onSubmit, busy, error, submitLabel = 'Regi
         <span className="text-xs text-graphite leading-relaxed">
           {consentLabel || (
             <>
-              I consent to this hospital storing my name, age, gender, mobile number and address,
-              and the last 4 digits of my Aadhaar number, to identify me and manage my visit.
-              My full Aadhaar number is not stored.
+              I consent to this hospital storing my name, age, gender, mobile number and address
+              to identify me and manage my visit.
             </>
           )}
         </span>

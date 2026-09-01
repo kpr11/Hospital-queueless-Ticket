@@ -53,7 +53,7 @@ export default function PatientRegister() {
         </h1>
         <p className="mt-4 text-graphite">
           Go to the <span className="font-medium text-ink">{labelOf(done.department)}</span> desk and give
-          your Aadhaar number. The staff will verify it and hand you your token number.
+          your mobile number. The staff will hand you your token number.
         </p>
         {done.priorityRequested && (
           <p className="mt-2 text-sm text-accent-deep">
@@ -66,11 +66,11 @@ export default function PatientRegister() {
           <div className="text-sm">
             <div className="label">Registered for</div>
             <div className="font-display text-2xl tracking-tightest mt-1">{labelOf(done.department)}</div>
-            <div className="mt-3 label">Aadhaar on file</div>
-            <div className="font-mono mt-1">XXXX XXXX {done.aadhaarLast4}</div>
+            <div className="mt-3 label">Patient ID (mobile)</div>
+            <div className="font-mono mt-1">{done.mobile}</div>
             <p className="mt-3 text-xs text-graphite">
               Scan this to check your status and see your token number the moment it's issued.
-              At the desk, just give your Aadhaar number.
+              At the desk, just give your mobile number.
             </p>
           </div>
         </div>
@@ -92,7 +92,7 @@ export default function PatientRegister() {
       <h1 className="font-display text-5xl tracking-tightest leading-[0.95]">Register patient</h1>
       <p className="mt-4 text-graphite max-w-xl">
         Fill in your details and pick the department you're here to see. You'll collect your
-        token number at that department's desk after a quick Aadhaar check.
+        token number at that department's desk — just give your mobile number.
       </p>
 
       <div className="mt-10">
