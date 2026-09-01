@@ -31,7 +31,6 @@ async function ensureInitialized() {
       lastCalledAt: null,
       pausedAt: null,
       pausedServices: [],
-      autoMode: { enabled: false, intervalSeconds: 0 },
     });
   }
   const counterSnap = await refs.counter().once('value');
@@ -521,7 +520,6 @@ async function resetQueue() {
       lastCalledAt: null,
       pausedAt: null,
       pausedServices: [],
-      autoMode: { enabled: false, intervalSeconds: 0 },
     }),
   ]);
   analytics.logEvent({ event_type: 'queue_reset', timestamp: Date.now() })

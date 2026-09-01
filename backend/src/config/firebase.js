@@ -43,12 +43,6 @@ const refs = {
   notifications: (username) => db.ref(`notifications/${username}`),
   notification: (username, id) => db.ref(`notifications/${username}/${id}`),
   notificationSignal: (username) => db.ref(`notificationSignals/${username}`),
-  // AI conversation workspace — per-user persistent chats (served via JWT API).
-  aiConversations: (u) => db.ref(`aiConversations/${u}`),
-  aiConversation: (u, cid) => db.ref(`aiConversations/${u}/${cid}`),
-  aiConversationMeta: (u, cid) => db.ref(`aiConversations/${u}/${cid}/meta`),
-  aiConversationMessages: (u, cid) => db.ref(`aiConversations/${u}/${cid}/messages`),
-  aiConversationMessage: (u, cid, mid) => db.ref(`aiConversations/${u}/${cid}/messages/${mid}`),
   // Secure shares (capability links) + audit log.
   shares: () => db.ref('shares'),
   share: (id) => db.ref(`shares/${id}`),

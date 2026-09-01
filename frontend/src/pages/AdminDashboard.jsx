@@ -1,11 +1,11 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { Navigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useQueueState } from '../hooks/useQueueState.js';
 import { useAppConfig } from '../hooks/useAppConfig.js';
 import { useQueues } from '../hooks/useQueues.js';
 import { getServiceLabel } from '../utils/industry.js';
-import { apiCallNext, apiCallNextPriority, apiSkipToken, apiPause, apiResume, apiReset, apiStartAutoMode, apiStopAutoMode, apiActiveQueue, apiSetAnnouncement, apiClearAnnouncement, apiSetAdminTokenNote, apiPauseService, apiResumeService, apiReferToken } from '../services/api.js';
+import { apiCallNext, apiCallNextPriority, apiSkipToken, apiPause, apiResume, apiReset, apiActiveQueue, apiSetAnnouncement, apiClearAnnouncement, apiSetAdminTokenNote, apiPauseService, apiResumeService, apiReferToken } from '../services/api.js';
 import StatusBadge from '../components/StatusBadge.jsx';
 import Stat from '../components/Stat.jsx';
 import LiveTimer from '../components/LiveTimer.jsx';
@@ -306,102 +306,6 @@ function QueueColumn({ service, called, waiting, onCallNext, onSkip, busy, skipB
   );
 }
 
-function AutoModePanel({ services, isPaused, queueState }) {
-  const [autoOn, setAutoOn] = useState(false);
-  const [intervalSecs, setIntervalSecs] = useState(null);
-  const [countdown, setCountdown] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
-  const countdownRef = useRef(null);
-
-  useEffect(() => {
-    const am = queueState?.autoMode;
-    if (am?.enabled && !autoOn) {
-      setAutoOn(true);
-      setIntervalSecs(am.intervalSeconds);
-    } else if (!am?.enabled && autoOn) {
-      setAutoOn(false);
-      clearInterval(countdownRef.current);
-      setCountdown(null);
-    }
-  }, [queueState, autoOn]);
-
-  useEffect(() => {
-    if (autoOn && intervalSecs) {
-      setCountdown(intervalSecs);
-      countdownRef.current = setInterval(() => {
-        setCountdown(c => {
-          if (c <= 1) return intervalSecs;
-          return c - 1;
-        });
-      }, 1000);
-    }
-    return () => clearInterval(countdownRef.current);
-  }, [autoOn, intervalSecs]);
-
-  const toggle = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      if (autoOn) {
-        await apiStopAutoMode();
-        setAutoOn(false);
-        setIntervalSecs(null);
-        clearInterval(countdownRef.current);
-        setCountdown(null);
-      } else {
-        const serviceIds = services.map(s => s.id);
-        const result = await apiStartAutoMode(serviceIds);
-        setAutoOn(true);
-        setIntervalSecs(result.intervalSeconds);
-      }
-    } catch (e) {
-      setError(e.response?.data?.error || 'Failed to toggle auto mode.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <div className={`p-5 border transition-colors ${autoOn ? 'border-success bg-success/5' : 'border-rule bg-cream'}`}>
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <div className="font-medium text-sm">AI Auto Mode</div>
-          <p className="text-xs text-graphite mt-1 max-w-xs">
-            {autoOn
-              ? `Automatically calling the next token every ${intervalSecs}s — optimised from your historical data.`
-              : 'Let the system call tokens automatically using ML-predicted intervals from your traffic history.'}
-          </p>
-          {autoOn && countdown !== null && (
-            <div className="mt-2 flex items-center gap-2">
-              <div className="w-24 h-1.5 bg-rule rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-success transition-all duration-1000"
-                  style={{ width: `${((intervalSecs - countdown) / intervalSecs) * 100}%` }}
-                />
-              </div>
-              <span className="text-xs text-graphite font-mono">next call in {countdown}s</span>
-            </div>
-          )}
-        </div>
-        <button
-          onClick={toggle}
-          disabled={loading || isPaused}
-          className={`shrink-0 px-4 py-2 text-sm border transition-colors ${
-            autoOn
-              ? 'border-accent text-accent hover:bg-accent hover:text-paper'
-              : 'border-success text-success hover:bg-success hover:text-paper'
-          } disabled:opacity-40`}
-        >
-          {loading ? '…' : autoOn ? 'Stop Auto' : 'Enable Auto Mode'}
-        </button>
-      </div>
-      {error && <p className="mt-2 text-xs text-accent">{error}</p>}
-      {isPaused && <p className="mt-2 text-xs text-warn">Resume the queue to use Auto Mode.</p>}
-    </div>
-  );
-}
-
 export default function AdminDashboard() {
   const { user } = useAuth();
   const { state: fbState, tokens: fbTokens, announcement: fbAnnouncement, error: fbError, loading: fbLoading } = useQueueState();
@@ -629,11 +533,6 @@ export default function AdminDashboard() {
         </Link>
       )}
 
-      {/* Auto Mode */}
-      <div className="mb-6">
-        <AutoModePanel services={services} isPaused={isPaused} queueState={state} />
-      </div>
-
       {/* Action bar */}
       <div className="mb-6 flex flex-wrap gap-3">
         {!isPaused ? (
@@ -642,7 +541,7 @@ export default function AdminDashboard() {
           <button onClick={() => run(apiResume)} disabled={busy} className="btn-secondary">Resume queue</button>
         )}
         <button
-          onClick={() => run(apiReset, 'Reset the entire queue? This permanently clears all tokens and stops auto mode.')}
+          onClick={() => run(apiReset, 'Reset the entire queue? This permanently clears all tokens.')}
           disabled={busy}
           className="btn-danger ml-auto"
         >

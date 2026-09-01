@@ -54,12 +54,10 @@ membership/RBAC server-side.
 ```
 routes → middleware (auth: requireAdmin / requireStaff / requireRole)
        → controllers (thin)
-       → services (queue, queueAdmin, messaging, notification, share,
-                   upload, prediction, analytics, audit, auth, staff)
+       → services (queue, queueAdmin, roster, consultation, messaging,
+                   notification, share, upload, analytics, audit, auth, staff)
        → config (env via Joi, firebase refs, roles)
 events/  in-process event bus (token.referred, queue.created, message.sent…)
-ai/      AIProvider abstraction (grounded default + OpenAI/Groq/Ollama/
-         OpenRouter/Gemini) + RAG retrieval layer
 ```
 
 ## RBAC
@@ -67,22 +65,6 @@ ai/      AIProvider abstraction (grounded default + OpenAI/Groq/Ollama/
 `superadmin > admin > manager` (admin tier) + `staff`. The bootstrap admin
 is auto-promoted to superadmin. `requireRole(min)` guards account/role
 management; sensitive actions append to the audit log.
-
-## AI assistant
-
-Retrieval-Augmented Generation over verified backend data only (traffic
-stats, predictions, queue overview, staff metrics). The default
-**grounded provider** answers deterministically with zero external calls;
-LLM providers are opt-in via `AI_PROVIDER` and fail over to grounded.
-The assistant never fabricates operational figures.
-
-## ML pipeline
-
-`analytics/models/train_predictor.py` trains service-time
-(GradientBoosting), arrival (seasonal), and anomaly (IsolationForest)
-models and exports a compact `predictions.json`. The backend loads it
-(mtime-cached, with a copy shipped in `backend/models/`) and falls back to
-explainable heuristics when absent — deterministic, cold-start safe.
 
 ## Free-tier constraints (deliberate)
 

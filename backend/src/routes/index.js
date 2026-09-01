@@ -12,7 +12,6 @@ router.use('/roster',   require('./roster.routes'));
 router.use('/consultations', require('./consultation.routes'));
 router.use('/admin',    require('./admin.routes'));
 router.use('/staff',    require('./staff.routes'));
-router.use('/assistant', require('./assistant.routes'));
 router.use(require('./messaging.routes')); // /conversations, /directory (per-route auth)
 router.use(require('./share.routes'));     // /shares (auth), /share/:id (public capability)
 router.use(require('./upload.routes'));    // /uploads (auth) — RTDB-backed shared files

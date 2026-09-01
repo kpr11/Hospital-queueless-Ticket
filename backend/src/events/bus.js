@@ -20,7 +20,6 @@ const EVENTS = Object.freeze({
   QUEUE_UPDATED: 'queue.updated',
   QUEUE_ARCHIVED: 'queue.archived',
   MESSAGE_SENT: 'message.sent',
-  PREDICTION_GENERATED: 'prediction.generated',
   PATIENT_REGISTERED: 'patient.registered',
 });
 

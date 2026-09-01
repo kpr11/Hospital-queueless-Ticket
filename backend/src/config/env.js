@@ -34,7 +34,6 @@ const envSchema = Joi.object({
 
   ANALYTICS_SINK: Joi.string().valid('csv', 'mongo').default('csv'),
   ANALYTICS_CSV_PATH: Joi.string().default('../analytics/data/queue_events.csv'),
-  ANALYTICS_MODEL_PATH: Joi.string().default('../analytics/models/predictions.json'),
 
   MONGO_URI: Joi.string().when('ANALYTICS_SINK', {
     is: 'mongo', then: Joi.required(), otherwise: Joi.optional()
@@ -52,12 +51,6 @@ const envSchema = Joi.object({
 
   // Frontend URL used to generate token tracking links in emails
   FRONTEND_URL: Joi.string().uri().default('http://localhost:5173'),
-
-  // AI assistant (all optional; defaults to the zero-config grounded provider).
-  AI_PROVIDER: Joi.string().valid('grounded', 'openai', 'groq', 'openrouter', 'ollama', 'gemini').default('grounded'),
-  AI_API_KEY: Joi.string().allow('').optional(),
-  AI_MODEL: Joi.string().allow('').optional(),
-  AI_BASE_URL: Joi.string().allow('').optional(),
 
   // Keying material for hashing Aadhaar numbers (HMAC-SHA256). Optional — falls
   // back to JWT_SECRET. Set a dedicated value so rotating the JWT secret does
@@ -128,7 +121,6 @@ module.exports = {
   analytics: {
     sink: env.ANALYTICS_SINK,
     csvPath: env.ANALYTICS_CSV_PATH,
-    modelPath: env.ANALYTICS_MODEL_PATH,
     mongo: {
       uri: env.MONGO_URI,
       db: env.MONGO_DB,
@@ -148,11 +140,4 @@ module.exports = {
   frontendUrl: env.FRONTEND_URL,
 
   aadhaarSalt: env.AADHAAR_SALT || null,
-
-  ai: {
-    provider: env.AI_PROVIDER,
-    apiKey: env.AI_API_KEY || null,
-    model: env.AI_MODEL || null,
-    baseUrl: env.AI_BASE_URL || null,
-  },
 };

@@ -31,9 +31,11 @@ their number is called. No app download, no accounts for customers.
 
 QueueLess is a full-stack, cloud-native digital queue management system that replaces paper tokens with a real-time browser experience. Customers take tokens from any device, track their live position, and get notified the moment their number is called — no app download required.
 
-Admins and staff manage the queue from a dedicated portal with a live dashboard, ML-assisted auto mode, granular analytics, and per-service staff portals. Every queue event is dual-written to MongoDB Atlas and a CSV event log, feeding a data mining pipeline that performs wait-time predictions, peak-hour heatmaps, and staffing recommendations.
+Admins and staff manage the queue from a dedicated portal with a live dashboard, per-department display boards, granular analytics, and per-service staff portals. Every queue event is dual-written to MongoDB Atlas and a CSV event log, feeding a data mining pipeline that performs wait-time predictions, peak-hour heatmaps, and staffing recommendations.
 
-**v1.3.x introduced the intelligent operational workspace:** admin-defined custom queues, cross-counter token referral, a grounded AI assistant (RAG, never fabricates data), internal team messaging (1:1 + group chat), a notification center, secure sharing with QR codes, shared files, and role-based access control — all on the free Firebase Spark plan (no Cloud Storage / Blaze required).
+**The operational workspace adds:** admin-defined custom queues, cross-counter token referral, internal team messaging (1:1 + group chat), a notification center, secure sharing with QR codes, shared files, and role-based access control — all on the free Firebase Spark plan (no Cloud Storage / Blaze required).
+
+**Hospital OPD flow:** patient registration with Aadhaar-verified token issuance, a daily doctor roster with round-robin room assignment, a per-room consultation workspace (diagnosis notes with per-patient history, lab/scan orders that auto-route to the Radiology/Lab queues), and per-room display boards.
 
 ---
 
@@ -62,7 +64,7 @@ Admins and staff manage the queue from a dedicated portal with a live dashboard,
 - **Call next / skip / no-show** — advance the queue or mark a token expired
 - **Priority queue** — priority tokens served first across all service counters; regular queues auto-blocked until cleared
 - **Pause / resume / reset** — full queue control including scheduled daily auto-reset
-- **ML Auto Mode** — automatically calls next tokens on a dynamically calculated interval from historical traffic
+- **Display boards launcher** — open a per-department board (or all counters) on a wall-mounted monitor
 - **Analytics dashboard** — peak-hour heatmap, hourly bar chart, service distribution, staff performance table, CSV export
 - **Detailed report** — full traffic heatmap, drop-off rate, staffing AI suggestions, print to PDF
 - **Appointment management** — list, confirm, and cancel customer bookings; confirmed appointments auto-merge into the queue ±5 min
@@ -83,13 +85,12 @@ Admins and staff manage the queue from a dedicated portal with a live dashboard,
 
 ### Display board (`/display`)
 - Fullscreen TV-optimised view — now-serving token per service, priority section, welcome banner, announcement banner, flash animation on token change, live clock
+- **Per-department board** (`/display?dept=<id>`) — a focused board for one area with a large now-serving number and an "up next" list; for OPD it renders one card per consulting room (room, doctor, now-serving token)
 
 ### Intelligent workspace (v1.3.x)
 
 - **Custom queue management** (`/admin/queues`) — admins create their own queues within an Industry Type with full CRUD: create, edit, enable/disable, archive, **delete (blocked while active tokens exist)**, reorder, capacity, working hours, average service time, token prefix, and **per-queue staff assignment** + analytics. Dedicated Create and Manage screens.
 - **Token referral / transfer** — move a live token between counters (e.g. hospital OPD → Eye Specialist); it keeps its number, records a referral trail, is served as priority-tier at the destination, and never auto-expires mid-transfer.
-- **AI Assistant** — a floating ✦ button on every screen + a full-screen workspace (`/assistant`). Answers operational questions (longest wait, today's summary, predicted traffic, staffing) using **Retrieval-Augmented Generation over verified backend data** — it never fabricates figures. Pluggable providers (zero-config grounded default + optional OpenAI / Groq / OpenRouter / Ollama / Gemini). Persistent conversation history (pin, rename, delete, export).
-- **Predictive insights** — explainable wait-time forecasts, congestion alerts, and recommendations from a trained model artefact (scikit-learn) with rule-based cold-start fallback.
 - **Internal messaging** — a **docked 💬 message tray** (bottom-anchored, slide-up, persistent) with **1:1 and group chat for admins & staff**, team directory, emoji reactions, read receipts ("Seen"), and inline attachments (≤256 KB). Real-time without external services.
 - **Notification Center** — a header 🔔 with unread badge + a dedicated screen (`/notifications`); driven by an application-wide event bus (token referred, queue created, new message, …).
 - **Secure sharing** — share queue snapshots / analytics as **capability links + QR codes** with a printable view (`/share/:id`) and expiry/revoke.
@@ -193,7 +194,6 @@ queueless/
 │   │   │   ├── staff.service.js    # Staff CRUD, PIN login, profile
 │   │   │   ├── analytics.service.js# Dual-write (MongoDB + CSV), traffic stats, Firebase cross-ref,
 │   │   │   │                       # staff performance metrics aggregation
-│   │   │   ├── autoMode.service.js # ML-assisted auto-call with dynamic interval
 │   │   │   ├── expiry.service.js   # Token expiry sweeper (every 5 min)
 │   │   │   ├── scheduler.service.js# Daily auto-reset scheduler (Asia/Karachi TZ, setInterval)
 │   │   │   ├── appointmentMerge.service.js # Auto-merge confirmed appointments → priority tokens (±5 min)
@@ -310,25 +310,21 @@ queueless/
 └── README.md
 ```
 
-**New modules in v1.3.x** (not exhaustively expanded above):
+**Additional modules** (not exhaustively expanded above):
 
 ```
 backend/src/
-├── ai/                  # AIProvider abstraction (grounded + LLM), RAG retrieval, assistant + conversation services
 ├── events/              # Application-wide event bus + subscriber registration
-├── services/            # queueAdmin, prediction, messaging, notification, share, upload, audit services
-├── controllers/         # assistant, messaging, notification, share, upload controllers
-├── routes/              # assistant, messaging, share, upload routes
-├── config/roles.js      # RBAC role hierarchy
-└── models/predictions.json   # Shipped trained ML artefact (free-plan fallback)
+├── services/            # queueAdmin, roster, consultation, messaging, notification, share, upload, audit services
+├── controllers/         # roster, consultation, messaging, notification, share, upload controllers
+├── routes/              # roster, consultation, messaging, share, upload routes
+└── config/roles.js      # RBAC role hierarchy
 
 frontend/src/
-├── components/          # AssistantDock, MessagingDeck, NotificationBell, ShareDialog, QueueForm, LiveTimer, PredictiveInsights, ErrorBoundary
-├── pages/               # AdminQueues(+New/+Edit), AdminAudit, AssistantWorkspace, Notifications, ShareView, SharedFiles, Credits
-├── services/api/        # Modular API client (client, queue, queues, messaging, notifications, assistant, share, files, …) re-exported by api.js
+├── components/          # MessagingDeck, NotificationBell, ShareDialog, QueueForm, LiveTimer, ConsultationPanel, ErrorBoundary
+├── pages/               # AdminQueues(+New/+Edit), AdminAudit, AdminRoster, Notifications, ShareView, SharedFiles, Credits
+├── services/api/        # Modular API client (client, queue, queues, roster, consultations, messaging, notifications, share, files, …) re-exported by api.js
 └── hooks/useQueues.js · utils/queueRegistry.js   # Custom-queue resolution
-
-analytics/models/train_predictor.py   # Trains GradientBoosting + IsolationForest → predictions.json
 ```
 
 ---
@@ -393,8 +389,8 @@ analytics/models/train_predictor.py   # Trains GradientBoosting + IsolationFores
 |---|---|---|
 | Queues | `GET/POST /admin/queues`, `GET /admin/queues/:id`, `PUT /admin/queues/:id`, `PUT /admin/queues/:id/enabled`, `PUT /admin/queues/:id/archive`, `DELETE /admin/queues/:id`, `PUT /admin/queues/reorder`, `GET /admin/queues/:id/staff`, `GET /admin/queues/:id/analytics` | admin-tier |
 | Referral | `POST /admin/queue/refer/:tokenId`, `POST /staff/queue/refer/:tokenId` | admin / staff |
-| Predictions | `GET /admin/predictions` | admin-tier |
-| AI assistant | `POST /assistant`, `GET/POST /assistant/conversations`, `GET/PUT/DELETE /assistant/conversations/:id` | admin / staff |
+| OPD roster | `GET /roster`, `GET /roster/public`, `POST /roster/doctors`, `DELETE /roster/doctors/:username`, `POST /roster/availability`, `POST /roster/reassign` | admin / staff |
+| Consultations | `GET /consultations`, `GET /consultations/lab-tests`, `PUT /consultations/:id`, `POST /consultations/:id/lab-orders`, `POST /consultations/:id/complete` | staff |
 | Messaging | `GET /directory`, `GET/POST /conversations`, `GET/POST /conversations/:id/messages`, `PUT /conversations/:id/read`, `PUT /conversations/:id/messages/:mid/react` | admin / staff |
 | Notifications | `GET /notifications`, `PUT /notifications/:id/read`, `PUT /notifications/read-all` | admin / staff |
 | Sharing | `POST/GET /shares`, `DELETE /shares/:id`, `GET /share/:id` (public capability) | admin / staff |
@@ -528,9 +524,10 @@ For the change log, see [CHANGELOG.md](CHANGELOG.md); full per-release notes liv
 
 ## 🧪 Testing
 
-The backend ships **48 integration tests** (Jest + Supertest) covering the
+The backend ships **70 integration tests** (Jest + Supertest) covering the
 queue engine, referral, custom queues, RBAC, messaging, notifications,
-sharing, uploads, the AI assistant, and every auth/error path. The Firebase
+sharing, uploads, the hospital OPD flow (registration, roster, room
+assignment, consultations), and every auth/error path. The Firebase
 layer is mocked in-memory, so the suite runs with **no external services**:
 
 ```bash
@@ -548,8 +545,8 @@ Clients cannot write operational or content-bearing Firebase RTDB data —
 those writes go through the JWT-protected API using the Admin SDK. The only
 direct client write is scoped staff presence. Message/notification/file
 content is served only after server-side membership + RBAC checks; passwords
-and PINs are bcrypt-hashed; logins, token issuance, and the AI assistant are
-rate-limited; sensitive admin actions land in an append-only audit log.
+and PINs are bcrypt-hashed; logins and token issuance are rate-limited;
+sensitive admin actions land in an append-only audit log.
 Report vulnerabilities privately — see [SECURITY.md](SECURITY.md).
 
 ## 🤝 Contributors

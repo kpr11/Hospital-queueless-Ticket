@@ -1,10 +1,8 @@
 const bcrypt = require('bcryptjs');
 const queueService = require('../services/queue.service');
 const queueAdminService = require('../services/queueAdmin.service');
-const autoModeService = require('../services/autoMode.service');
 const staffService = require('../services/staff.service');
 const analyticsService = require('../services/analytics.service');
-const predictionService = require('../services/prediction.service');
 const auditService = require('../services/audit.service');
 const authService = require('../services/auth.service');
 const { refs } = require('../config/firebase');
@@ -57,7 +55,6 @@ async function activeQueue(req, res) {
 }
 
 async function reset(req, res) {
-  await autoModeService.stopAutoMode();
   await queueService.resetQueue();
   res.json({ message: 'Queue reset.' });
 }
@@ -79,28 +76,8 @@ async function getStaffMetrics(req, res) {
   res.json(data);
 }
 
-async function getPredictions(req, res) {
-  const data = await predictionService.getPredictions();
-  res.json(data);
-}
-
 async function getAuditLog(req, res) {
   res.json(await auditService.list({ limit: 200 }));
-}
-
-async function startAutoMode(req, res) {
-  const { services } = req.body;
-  const result = await autoModeService.startAutoMode(services);
-  res.json({ message: 'Auto mode started.', ...result });
-}
-
-async function stopAutoMode(req, res) {
-  await autoModeService.stopAutoMode();
-  res.json({ message: 'Auto mode stopped.' });
-}
-
-async function getAutoModeStatus(req, res) {
-  res.json({ running: autoModeService.isRunning() });
 }
 
 async function getAppConfig(req, res) {
@@ -456,8 +433,7 @@ async function setAdminRole(req, res) {
 
 module.exports = {
   callNext, callNextPriority, pause, resume, activeQueue, reset,
-  getAnalytics, exportAnalyticsCsv, getStaffMetrics, getPredictions, getAuditLog,
-  startAutoMode, stopAutoMode, getAutoModeStatus,
+  getAnalytics, exportAnalyticsCsv, getStaffMetrics, getAuditLog,
   getAppConfig, updateAppConfig,
   getFeedback,
   listStaff, createStaff, removeStaff, assignStaffQueue,

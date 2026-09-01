@@ -26,7 +26,6 @@ const AdminQueueEdit = lazy(() => import('./pages/AdminQueueEdit.jsx'));
 const AdminAudit = lazy(() => import('./pages/AdminAudit.jsx'));
 const Credits = lazy(() => import('./pages/Credits.jsx'));
 const Notifications = lazy(() => import('./pages/Notifications.jsx'));
-const AssistantWorkspace = lazy(() => import('./pages/AssistantWorkspace.jsx'));
 const ShareView = lazy(() => import('./pages/ShareView.jsx'));
 const SharedFiles = lazy(() => import('./pages/SharedFiles.jsx'));
 const AdminChangePassword = lazy(() => import('./pages/AdminChangePassword.jsx'));
@@ -58,7 +57,6 @@ export default function App() {
             <Route path="/registration/:id"   element={<RegistrationStatus />} />
             <Route path="/credits"            element={<Credits />} />
             <Route path="/notifications"      element={<Notifications />} />
-            <Route path="/assistant"          element={<AssistantWorkspace />} />
             <Route path="/share/:id"          element={<ShareView />} />
             <Route path="/files"              element={<SharedFiles />} />
             <Route path="/lookup"             element={<Lookup />} />

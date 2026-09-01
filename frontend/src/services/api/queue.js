@@ -13,10 +13,6 @@ export const apiReset            = () => api.post('/admin/queue/reset').then(r =
 export const apiPauseService  = (service) => api.post('/admin/queue/pause-service', { service }).then(r => r.data);
 export const apiResumeService = (service) => api.post('/admin/queue/resume-service', { service }).then(r => r.data);
 
-// Auto mode
-export const apiStartAutoMode = (services) => api.post('/admin/auto-mode/start', { services }).then(r => r.data);
-export const apiStopAutoMode  = () => api.post('/admin/auto-mode/stop').then(r => r.data);
-
 // Token referral / transfer between counters
 export const apiReferToken      = (tokenId, toService, reason) => api.post(`/admin/queue/refer/${tokenId}`, { toService, reason: reason || undefined }).then(r => r.data);
 export const apiStaffReferToken = (tokenId, toService, reason) => api.post(`/staff/queue/refer/${tokenId}`, { toService, reason: reason || undefined }).then(r => r.data);

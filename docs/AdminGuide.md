@@ -19,7 +19,9 @@ immediately.
   live token — it keeps its number and gets priority at the destination).
 - Global pause/resume/reset, per-service pause, live announcements,
   token lookup with inline notes, SLA overdue alerts (click through to
-  Analytics), ML **Auto Mode**.
+  Analytics).
+- **Display boards** panel — open a per-department board (or all
+  counters) on a wall-mounted monitor.
 - Metric tiles deep-link into Analytics.
 
 ## Queues (`/admin/queues`)
@@ -33,9 +35,8 @@ and a shareable snapshot (link + QR).
 
 Live data (auto-refresh 30 s) filtered to your current Industry Type /
 custom queues — counters with no activity don't clutter the charts.
-Includes Smart Staffing recommendations, staff performance, predictive
-insights (trained ML with heuristic fallback), and the enriched CSV export
-(token numbers, serving counter, organisation name).
+Includes Smart Staffing recommendations, staff performance, and the
+enriched CSV export (token numbers, serving counter, organisation name).
 
 ## Team & accounts
 
@@ -49,8 +50,6 @@ insights (trained ML with heuristic fallback), and the enriched CSV export
 
 ## Workspace tools
 
-- **✦ AI Assistant** — floating button (bottom-left) or full workspace
-  under the ADMIN ▾ menu. Answers only from live queue data.
 - **💬 Messaging** — docked tray (bottom-right): 1:1 and group chats,
   reactions, read receipts, small attachments. Panels close automatically
   when you switch screens.

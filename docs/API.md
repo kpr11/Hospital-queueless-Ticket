@@ -69,7 +69,6 @@ Stale `registered` records are auto-marked `expired` after
 | POST | `/admin/queue/pause` · `/resume` · `/reset` | Global queue control |
 | POST | `/admin/queue/pause-service` · `/resume-service` | `{service}` |
 | PUT  | `/admin/queue/tokens/:tokenId/note` | Attach note |
-| POST | `/admin/auto-mode/start` · `/stop` · GET `/admin/auto-mode` | ML auto-call |
 | PUT/DELETE | `/admin/announcement` | Set / clear broadcast |
 
 ## Custom queues (admin)
@@ -103,7 +102,6 @@ Stale `registered` records are auto-marked `expired` after
 | GET | `/admin/analytics` | Traffic stats: peaks, distribution, trend, drop-off |
 | GET | `/admin/analytics/staff` | Per-staff performance (Mongo aggregation) |
 | GET | `/admin/analytics/export` | Enriched CSV (token #, counter, org name) |
-| GET | `/admin/predictions` | Wait forecasts, congestion alerts, recommendations |
 | GET | `/admin/audit` | Append-only audit log (last 200) |
 
 ## Accounts & RBAC
@@ -119,14 +117,6 @@ Stale `registered` records are auto-marked `expired` after
 | DELETE | `/admin/admins/:username` | admin+ | Delete (superadmin protected) |
 | GET/PUT | `/admin/profile` · POST `/admin/change-password` | admin | Own account |
 | GET/PUT | `/admin/config` | admin | Org settings |
-
-## AI assistant (staff)
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST | `/assistant` (rate-limited 20/min/user) | Ask `{question, history?, conversationId?}` → grounded answer |
-| GET/POST | `/assistant/conversations` | List / create saved chats |
-| GET/PUT/DELETE | `/assistant/conversations/:id` | Fetch / rename+pin / delete |
 
 ## Messaging & notifications (staff)
 

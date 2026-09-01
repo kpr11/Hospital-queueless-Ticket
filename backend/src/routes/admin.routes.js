@@ -17,12 +17,7 @@ router.post('/queue/resume-service',    asyncHandler(controller.resumeService));
 router.get('/analytics',                asyncHandler(controller.getAnalytics));
 router.get('/analytics/export',         asyncHandler(controller.exportAnalyticsCsv));
 router.get('/analytics/staff',          asyncHandler(controller.getStaffMetrics));
-router.get('/predictions',              asyncHandler(controller.getPredictions));
 router.get('/audit',                    asyncHandler(controller.getAuditLog));
-
-router.get('/auto-mode',                asyncHandler(controller.getAutoModeStatus));
-router.post('/auto-mode/start',         asyncHandler(controller.startAutoMode));
-router.post('/auto-mode/stop',          asyncHandler(controller.stopAutoMode));
 
 router.get('/config',                   asyncHandler(controller.getAppConfig));
 router.put('/config',                   asyncHandler(controller.updateAppConfig));

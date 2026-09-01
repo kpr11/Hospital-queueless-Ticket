@@ -95,11 +95,6 @@ jest.mock('../src/config/firebase', () => {
       notifications: (u) => makeRef(`notifications/${u}`),
       notification: (u, id) => makeRef(`notifications/${u}/${id}`),
       notificationSignal: (u) => makeRef(`notificationSignals/${u}`),
-      aiConversations: (u) => makeRef(`aiConversations/${u}`),
-      aiConversation: (u, cid) => makeRef(`aiConversations/${u}/${cid}`),
-      aiConversationMeta: (u, cid) => makeRef(`aiConversations/${u}/${cid}/meta`),
-      aiConversationMessages: (u, cid) => makeRef(`aiConversations/${u}/${cid}/messages`),
-      aiConversationMessage: (u, cid, mid) => makeRef(`aiConversations/${u}/${cid}/messages/${mid}`),
       shares: () => makeRef('shares'),
       share: (id) => makeRef(`shares/${id}`),
       auditLogs: () => makeRef('auditLogs'),
@@ -403,124 +398,6 @@ describe('Queue management (custom queues)', () => {
       .set('Authorization', `Bearer ${adminToken}`);
     expect(list.status).toBe(200);
     expect(list.body.some(m => m.username === 'drcardio')).toBe(true);
-  });
-});
-
-describe('Predictive insights', () => {
-  let adminToken;
-
-  beforeAll(async () => {
-    const res = await request(app).post('/api/v1/auth/login').send({
-      username: 'admin',
-      password: 'testpassword123',
-    });
-    adminToken = res.body.token;
-  });
-
-  test('returns an explainable, deterministic prediction payload', async () => {
-    const res = await request(app).get('/api/v1/admin/predictions').set('Authorization', `Bearer ${adminToken}`);
-    expect(res.status).toBe(200);
-    expect(res.body).toHaveProperty('coldStart');
-    expect(res.body).toHaveProperty('sampleSize');
-    expect(Array.isArray(res.body.queues)).toBe(true);
-    expect(Array.isArray(res.body.congestion)).toBe(true);
-    expect(Array.isArray(res.body.recommendations)).toBe(true);
-    // Every per-queue prediction must carry an explainable basis + confidence.
-    res.body.queues.forEach(q => {
-      expect(q).toHaveProperty('basis');
-      expect(['low', 'medium', 'high']).toContain(q.confidence);
-    });
-  });
-
-  test('requires authentication', async () => {
-    const res = await request(app).get('/api/v1/admin/predictions');
-    expect(res.status).toBe(401);
-  });
-});
-
-describe('AI assistant', () => {
-  let adminToken;
-
-  beforeAll(async () => {
-    const res = await request(app).post('/api/v1/auth/login').send({
-      username: 'admin',
-      password: 'testpassword123',
-    });
-    adminToken = res.body.token;
-  });
-
-  test('answers a grounded question from verified data', async () => {
-    const res = await request(app)
-      .post('/api/v1/assistant')
-      .set('Authorization', `Bearer ${adminToken}`)
-      .send({ question: 'Which queue has the longest waiting time?' });
-    expect(res.status).toBe(200);
-    expect(typeof res.body.answer).toBe('string');
-    expect(res.body.answer.length).toBeGreaterThan(0);
-    expect(res.body.provider).toBe('grounded');     // default zero-config provider
-    expect(res.body.sources).toContain('queues_overview');
-  });
-
-  test('rejects an empty question', async () => {
-    const res = await request(app)
-      .post('/api/v1/assistant')
-      .set('Authorization', `Bearer ${adminToken}`)
-      .send({ question: '   ' });
-    expect(res.status).toBe(400);
-  });
-
-  test('persists turns to a saved conversation (workspace)', async () => {
-    const create = await request(app)
-      .post('/api/v1/assistant/conversations')
-      .set('Authorization', `Bearer ${adminToken}`)
-      .send({});
-    expect(create.status).toBe(201);
-    const cid = create.body.id;
-
-    const ask = await request(app)
-      .post('/api/v1/assistant')
-      .set('Authorization', `Bearer ${adminToken}`)
-      .send({ question: 'How is staff performance?', conversationId: cid });
-    expect(ask.status).toBe(200);
-    expect(ask.body.conversationId).toBe(cid);
-
-    const conv = await request(app)
-      .get(`/api/v1/assistant/conversations/${cid}`)
-      .set('Authorization', `Bearer ${adminToken}`);
-    expect(conv.status).toBe(200);
-    // user + assistant turns persisted, and the title auto-derived from the question
-    expect(conv.body.messages.length).toBe(2);
-    expect(conv.body.messages[0].role).toBe('user');
-    expect(conv.body.title).toMatch(/staff performance/i);
-
-    const list = await request(app)
-      .get('/api/v1/assistant/conversations')
-      .set('Authorization', `Bearer ${adminToken}`);
-    expect(list.body.some(c => c.id === cid)).toBe(true);
-
-    const del = await request(app)
-      .delete(`/api/v1/assistant/conversations/${cid}`)
-      .set('Authorization', `Bearer ${adminToken}`);
-    expect(del.status).toBe(200);
-  });
-
-  test('requires authentication', async () => {
-    const res = await request(app).post('/api/v1/assistant').send({ question: 'hi' });
-    expect(res.status).toBe(401);
-  });
-
-  // Kept last in this suite: it intentionally exhausts the per-user assistant
-  // quota, and nothing after this calls POST /assistant as the admin user.
-  test('rate-limits excessive assistant requests', async () => {
-    let limited = false;
-    for (let i = 0; i < 25; i++) {
-      const res = await request(app)
-        .post('/api/v1/assistant')
-        .set('Authorization', `Bearer ${adminToken}`)
-        .send({ question: `ping ${i}` });
-      if (res.status === 429) { limited = true; break; }
-    }
-    expect(limited).toBe(true);
   });
 });
 

@@ -5,7 +5,6 @@ import { useAppConfig } from '../hooks/useAppConfig.js';
 import { getServiceLabel, getServices } from '../utils/industry.js';
 import { apiAnalytics, apiStaffMetrics, ADMIN_TOKEN_KEY } from '../services/api.js';
 import Stat from '../components/Stat.jsx';
-import PredictiveInsights from '../components/PredictiveInsights.jsx';
 
 const COLORS = ['#4B6FBF', '#3F6F4F', '#8B5CF6', '#C84B26', '#B8881C', '#0891B2'];
 
@@ -156,11 +155,6 @@ export default function AdminAnalytics() {
         <div className="bg-paper p-5"><Stat label="Referred" value={totalReferred} /></div>
         <div className="bg-paper p-5"><Stat label="Drop-off Rate" value={`${(dropOffRate * 100).toFixed(1)}%`} accent /></div>
         <div className="bg-paper p-5"><Stat label="Avg Wait" value={waitDisplay} /></div>
-      </div>
-
-      {/* Predictive insights (ML-assisted, explainable) */}
-      <div className="mb-8">
-        <PredictiveInsights />
       </div>
 
       {/* Staff Performance */}

@@ -1,18 +1,13 @@
 # Troubleshooting
 
-## `Route not found: GET /api/v1/admin/queues/overview` (or /audit, /conversations, /notifications, /uploads, /assistant)
+## `Route not found: GET /api/v1/admin/queues/overview` (or /audit, /conversations, /notifications, /uploads, /roster, /consultations)
 
-The deployed **backend is older than the frontend**. These routes exist
-from v1.3.5+; redeploy the Render backend. Verify with:
+The deployed **backend is older than the frontend**. Redeploy the Render
+backend. Verify with:
 
 ```bash
 curl https://<backend>/                  # → { version: "1.6.0", ... }
 ```
-
-## AI assistant says "could not reach the operational data"
-
-Same root cause as above — the backend the frontend points at doesn't have
-`/assistant`. Redeploy, or point `VITE_API_BASE_URL` at a current backend.
 
 ## Backend won't start — `FIREBASE_PRIVATE_KEY` error
 

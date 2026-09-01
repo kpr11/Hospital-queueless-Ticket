@@ -16,7 +16,6 @@ export * from './api/queues.js';
 export * from './api/staff.js';
 export * from './api/analytics.js';
 export * from './api/admin.js';
-export * from './api/assistant.js';
 export * from './api/messaging.js';
 export * from './api/notifications.js';
 export * from './api/share.js';

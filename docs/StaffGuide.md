@@ -24,10 +24,9 @@ You see the queue for your assigned service only:
 
 ## Workspace tools
 
-Same as admins: ✦ AI Assistant (bottom-left), 💬 docked messaging tray
-(bottom-right — chat 1:1 or in groups with the whole team), 🔔
-notifications, and 📁 shared files. All panels close automatically when
-you switch screens.
+Same as admins: 💬 docked messaging tray (bottom-right — chat 1:1 or in
+groups with the whole team), 🔔 notifications, and 📁 shared files. All
+panels close automatically when you switch screens.
 
 ## Presence
 

@@ -5,7 +5,6 @@ import { useStaff } from '../context/StaffContext.jsx';
 import { useTheme } from '../context/ThemeContext.jsx';
 import { useAppConfig } from '../hooks/useAppConfig.js';
 import { useSessionExpiry } from '../hooks/useSessionExpiry.js';
-import AssistantDock from './AssistantDock.jsx';
 import MessagingDeck from './MessagingDeck.jsx';
 import NotificationBell from './NotificationBell.jsx';
 import ErrorBoundary from './ErrorBoundary.jsx';
@@ -191,10 +190,6 @@ export default function Layout({ children }) {
                         <span className="text-base leading-none">🔑</span>
                         <span>Change password</span>
                       </Link>
-                      <Link to="/assistant" onClick={() => setAdminDropOpen(false)} className="flex items-center gap-3 px-4 py-2.5 text-sm text-graphite hover:text-ink hover:bg-cream transition-colors">
-                        <span className="text-base leading-none">✦</span>
-                        <span>AI Workspace</span>
-                      </Link>
                       <Link to="/files" onClick={() => setAdminDropOpen(false)} className="flex items-center gap-3 px-4 py-2.5 text-sm text-graphite hover:text-ink hover:bg-cream transition-colors">
                         <span className="text-base leading-none">📁</span>
                         <span>Shared files</span>
@@ -285,14 +280,6 @@ export default function Layout({ children }) {
                         <span>Change password</span>
                       </Link>
                       <Link
-                        to="/assistant"
-                        onClick={() => setAdminDropOpen(false)}
-                        className="flex items-center gap-3 px-4 py-2.5 text-sm text-graphite hover:text-ink hover:bg-cream transition-colors"
-                      >
-                        <span className="text-base leading-none">✦</span>
-                        <span>AI Workspace</span>
-                      </Link>
-                      <Link
                         to="/notifications"
                         onClick={() => setAdminDropOpen(false)}
                         className="flex items-center gap-3 px-4 py-2.5 text-sm text-graphite hover:text-ink hover:bg-cream transition-colors"
@@ -356,7 +343,6 @@ export default function Layout({ children }) {
                   </div>
                   <Link to="/admin/profile" onClick={() => setMobileOpen(false)} className="py-2 text-graphite hover:text-ink">My profile</Link>
                   <Link to="/admin/change-password" onClick={() => setMobileOpen(false)} className="py-2 text-graphite hover:text-ink">Change password</Link>
-                  <Link to="/assistant" onClick={() => setMobileOpen(false)} className="py-2 text-graphite hover:text-ink">AI Workspace</Link>
                   <Link to="/notifications" onClick={() => setMobileOpen(false)} className="py-2 text-graphite hover:text-ink">Notifications</Link>
                   <button
                     onClick={() => handleLogout(false)}
@@ -372,7 +358,6 @@ export default function Layout({ children }) {
                   <Link to="/staff" onClick={() => setMobileOpen(false)} className="py-2 text-graphite hover:text-ink font-medium">My Queue</Link>
                   <Link to="/staff/profile" onClick={() => setMobileOpen(false)} className="py-2 text-graphite hover:text-ink">My profile</Link>
                   <Link to="/staff/change-password" onClick={() => setMobileOpen(false)} className="py-2 text-graphite hover:text-ink">Change password</Link>
-                  <Link to="/assistant" onClick={() => setMobileOpen(false)} className="py-2 text-graphite hover:text-ink">AI Workspace</Link>
                   <Link to="/files" onClick={() => setMobileOpen(false)} className="py-2 text-graphite hover:text-ink">Shared files</Link>
                   <Link to="/notifications" onClick={() => setMobileOpen(false)} className="py-2 text-graphite hover:text-ink">Notifications</Link>
                   <div className="py-2 flex items-center justify-between border-t border-rule mt-1">
@@ -445,8 +430,7 @@ export default function Layout({ children }) {
         </div>
       </footer>
 
-      {/* Global floating docks (self-hide unless an admin/staff is signed in) */}
-      <AssistantDock />
+      {/* Global floating dock (self-hides unless an admin/staff is signed in) */}
       <MessagingDeck />
     </div>
   );

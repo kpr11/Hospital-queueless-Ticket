@@ -28,7 +28,7 @@ function requireAdmin(req, res, next) {
   next();
 }
 
-// Admin-tier OR staff (used for shared features like messaging and the assistant).
+// Admin-tier OR staff (used for shared features like messaging).
 function requireStaff(req, res, next) {
   const payload = extractPayload(req, res);
   if (!payload) return;
