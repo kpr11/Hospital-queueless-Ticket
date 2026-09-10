@@ -1,6 +1,17 @@
 const staffService = require('../services/staff.service');
 const queueService = require('../services/queue.service');
 const { refs } = require('../config/firebase');
+const { isAdminTier } = require('../config/roles');
+const { publicToken } = require('../utils/publicToken');
+
+async function checkTokenAccess(req) {
+  const token = (await refs.token(req.params.tokenId).once('value')).val();
+  if (!token) throw Object.assign(new Error('Token not found.'), { statusCode: 404 });
+  if (!isAdminTier(req.user.role) && token.service !== req.user.service) {
+    throw Object.assign(new Error('Token belongs to another department.'), { statusCode: 403 });
+  }
+}
+
 
 async function login(req, res) {
   const { username, password } = req.body;
@@ -16,6 +27,11 @@ async function loginPin(req, res) {
 
 async function getQueue(req, res) {
   const data = await queueService.getActiveQueue();
+  if (!isAdminTier(req.user.role)) {
+    const visible = token => token.service === req.user.service ? token : publicToken(token);
+    data.waiting = data.waiting.map(visible);
+    data.nowServing = Object.fromEntries(Object.entries(data.nowServing).map(([key, token]) => [key, visible(token)]));
+  }
   res.json(data);
 }
 
@@ -47,6 +63,7 @@ async function changePassword(req, res) {
 }
 
 async function referToken(req, res) {
+  await checkTokenAccess(req);
   const { tokenId } = req.params;
   const { toService, reason } = req.body || {};
   const result = await queueService.referToken(tokenId, {
@@ -58,6 +75,7 @@ async function referToken(req, res) {
 }
 
 async function setTokenNote(req, res) {
+  await checkTokenAccess(req);
   const { tokenId } = req.params;
   const { note } = req.body;
   const snap = await refs.token(tokenId).once('value');

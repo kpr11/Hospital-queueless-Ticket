@@ -1,4 +1,16 @@
 const consultationService = require('../services/consultation.service');
+const { refs } = require('../config/firebase');
+const { isAdminTier } = require('../config/roles');
+
+async function requirePatientHistoryAccess(user, patientId) {
+  if (isAdminTier(user.role)) return;
+  const tokens = Object.values((await refs.tokens().once('value')).val() || {});
+  const assigned = tokens.some(token => token.patientId === patientId && token.assignedTo === user.sub);
+  const history = await consultationService.historyForPatient(patientId);
+  if (!assigned && !history.some(record => record.doctorUsername === user.sub)) {
+    throw Object.assign(new Error('Patient is not assigned to this doctor.'), { statusCode: 403 });
+  }
+}
 
 // GET /consultations/lab-tests — the orderable test catalogue for the doctor UI.
 async function labTests(req, res) {
@@ -12,6 +24,11 @@ async function labTests(req, res) {
 async function get(req, res) {
   const { tokenId, patientId, excludeId } = req.query;
   if (tokenId) {
+    const token = (await refs.token(tokenId).once('value')).val();
+    if (!token) return res.status(404).json({ error: 'Token not found.' });
+    if (!isAdminTier(req.user.role) && token.assignedTo !== req.user.sub) {
+      return res.status(403).json({ error: 'Patient is not assigned to this doctor.' });
+    }
     const consultation = await consultationService.openForToken({
       tokenId,
       doctorUsername: req.user.sub,
@@ -21,6 +38,7 @@ async function get(req, res) {
     return res.json({ consultation, history });
   }
   if (patientId) {
+    await requirePatientHistoryAccess(req.user, patientId);
     return res.json({ history: await consultationService.historyForPatient(patientId, excludeId || null) });
   }
   res.status(400).json({ error: 'tokenId or patientId is required.' });

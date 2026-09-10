@@ -1,0 +1,10 @@
+steps:
+  - name: gcr.io/cloud-builders/docker
+    args: ['build', '-f', 'backend/Dockerfile', '-t', '${_REGION}-docker.pkg.dev/$PROJECT_ID/queueless/backend:$BUILD_ID', '.']
+images:
+  - '${_REGION}-docker.pkg.dev/$PROJECT_ID/queueless/backend:$BUILD_ID'
+substitutions:
+  _REGION: asia-southeast1
+options:
+  logging: CLOUD_LOGGING_ONLY
+timeout: 1200s

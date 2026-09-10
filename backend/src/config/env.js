@@ -10,6 +10,8 @@ const envSchema = Joi.object({
   JWT_EXPIRES_IN: Joi.string().default('8h'),
 
   ADMIN_USERNAME: Joi.string().required(),
+  INITIAL_INDUSTRY: Joi.string().valid('general', 'medical', 'bank', 'restaurant').default('general'),
+  INITIAL_ORG_NAME: Joi.string().max(100).default('QueueLess'),
   ADMIN_PASSWORD: Joi.string().min(8).required(),
   // Break-glass: when true, the bootstrap admin's password is reset to
   // ADMIN_PASSWORD on every boot (even if the account already exists). Use it
@@ -21,8 +23,8 @@ const envSchema = Joi.object({
   ERROR_WEBHOOK_URL: Joi.string().uri().allow('').optional(),
 
   FIREBASE_PROJECT_ID: Joi.string().required(),
-  FIREBASE_CLIENT_EMAIL: Joi.string().email().required(),
-  FIREBASE_PRIVATE_KEY: Joi.string().required(),
+  FIREBASE_CLIENT_EMAIL: Joi.string().email().optional(),
+  FIREBASE_PRIVATE_KEY: Joi.string().optional(),
   FIREBASE_DATABASE_URL: Joi.string().uri().required(),
 
   AVG_SERVICE_TIME_SECONDS: Joi.number().integer().positive().default(180),
@@ -32,7 +34,7 @@ const envSchema = Joi.object({
   // marked "expired" after this many hours.
   PATIENT_REGISTRATION_TTL_HOURS: Joi.number().integer().positive().default(12),
 
-  ANALYTICS_SINK: Joi.string().valid('csv', 'mongo').default('csv'),
+  ANALYTICS_SINK: Joi.string().valid('csv', 'mongo', 'firebase').default('csv'),
   ANALYTICS_CSV_PATH: Joi.string().default('../analytics/data/queue_events.csv'),
 
   MONGO_URI: Joi.string().when('ANALYTICS_SINK', {
@@ -51,7 +53,7 @@ const envSchema = Joi.object({
 
   // Frontend URL used to generate token tracking links in emails
   FRONTEND_URL: Joi.string().uri().default('http://localhost:5173'),
-}).unknown(true);
+}).and('FIREBASE_CLIENT_EMAIL', 'FIREBASE_PRIVATE_KEY').unknown(true);
 
 const { value: env, error } = envSchema.validate(process.env, { abortEarly: false });
 
@@ -67,13 +69,13 @@ if (error) {
 //  - literal "\n" two-char sequences (dotenv / most dashboards)
 //  - real newlines (Render/Heroku multi-line values) — left as-is
 //  - stray \r from Windows clipboards
-const firebasePrivateKey = env.FIREBASE_PRIVATE_KEY
+const firebasePrivateKey = (env.FIREBASE_PRIVATE_KEY || '')
   .trim()
   .replace(/^["']|["']$/g, '')
   .replace(/\\n/g, '\n')
   .replace(/\r/g, '');
 
-if (!/-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]+-----END [A-Z ]*PRIVATE KEY-----/.test(firebasePrivateKey)) {
+if (firebasePrivateKey && !/-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]+-----END [A-Z ]*PRIVATE KEY-----/.test(firebasePrivateKey)) {
   console.error('[env] FIREBASE_PRIVATE_KEY does not look like a PEM key. Paste the value of "private_key" from the service-account JSON, keeping the \\n sequences, without the surrounding quotes.');
   process.exit(1);
 }
@@ -94,6 +96,7 @@ module.exports = {
     password: env.ADMIN_PASSWORD,
     resetOnBoot: env.ADMIN_RESET_ON_BOOT,
   },
+  initialConfig: { industry: env.INITIAL_INDUSTRY, orgName: env.INITIAL_ORG_NAME },
 
   errorWebhookUrl: env.ERROR_WEBHOOK_URL || null,
 

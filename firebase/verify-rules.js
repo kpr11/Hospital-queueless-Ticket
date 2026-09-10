@@ -28,7 +28,7 @@ function webConfig() {
 
 const EXPECT = [
   ['queue/state', 'allow'],
-  ['queue/tokens', 'allow'],
+  ['queue/tokens', 'deny'],
   ['queue/announcement', 'allow'],
   ['presence', 'allow'],
   ['hospital/patients', 'deny'],

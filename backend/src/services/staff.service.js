@@ -42,7 +42,7 @@ async function loginByPin(pin) {
     const ok = await bcrypt.compare(pin, account.pinHash);
     if (ok) {
       const token = jwt.sign(
-        { sub: account.username, role: 'staff', service: account.service, displayName: account.displayName },
+        { sub: account.username, sessionVersion: account.passwordResetAt || 0, role: 'staff', service: account.service, displayName: account.displayName },
         config.jwt.secret,
         { expiresIn: '12h' }
       );
@@ -71,7 +71,7 @@ async function loginStaff(username, password) {
   }
 
   const token = jwt.sign(
-    { sub: username, role: 'staff', service: account.service, displayName: account.displayName },
+    { sub: username, sessionVersion: account.passwordResetAt || 0, role: 'staff', service: account.service, displayName: account.displayName },
     config.jwt.secret,
     { expiresIn: config.jwt.expiresIn }
   );
@@ -90,9 +90,9 @@ async function listStaff() {
   ]);
   const all = staffSnap.val() || {};
   const presence = presenceSnap.val() || {};
-  return Object.values(all).map(({ passwordHash, ...rest }) => ({
+  return Object.values(all).map(({ passwordHash: _passwordHash, pinHash: _pinHash, ...rest }) => ({
     ...rest,
-    online: presence[rest.username]?.online || false,
+    online: !!presence[rest.username]?.online && Date.now() - presence[rest.username].lastSeen < 90000,
     lastSeen: presence[rest.username]?.lastSeen || null,
   }));
 }
@@ -135,7 +135,7 @@ async function changeStaffPassword(username, currentPassword, newPassword) {
   if (!ok) throw Object.assign(new Error('Current password is incorrect.'), { statusCode: 401 });
   if (newPassword.length < 8) throw Object.assign(new Error('New password must be at least 8 characters.'), { statusCode: 400 });
   const passwordHash = await bcrypt.hash(newPassword, BCRYPT_ROUNDS);
-  await refs.staffMember(username).update({ passwordHash });
+  await refs.staffMember(username).update({ passwordHash, passwordResetAt: Date.now() });
 }
 
 module.exports = { createStaff, loginStaff, loginByPin, listStaff, deleteStaff, getStaffProfile, updateStaffProfile, changeStaffPassword, assignStaffToQueue };

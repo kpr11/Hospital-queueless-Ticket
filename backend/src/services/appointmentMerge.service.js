@@ -9,7 +9,7 @@ let timer = null;
 function getCurrentMinutesSinceMidnight() {
   try {
     const parts = new Intl.DateTimeFormat('en-GB', {
-      timeZone: 'Asia/Karachi',
+      timeZone: 'Asia/Kolkata',
       hour: '2-digit',
       minute: '2-digit',
       hour12: false,
@@ -25,7 +25,7 @@ function getCurrentMinutesSinceMidnight() {
 
 function getCurrentDateStr() {
   try {
-    return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Karachi' }).format(new Date());
+    return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date());
   } catch {
     return new Date().toISOString().slice(0, 10);
   }

@@ -47,7 +47,10 @@ async function openForToken({ tokenId, doctorUsername, doctorName }) {
   const token = tokenSnap.val();
 
   const existing = (await allConsultations()).find(c => c.tokenId === tokenId);
-  if (existing) return existing;
+  if (existing) {
+    if (existing.doctorUsername !== doctorUsername) throw bad('Not your consultation.', 403);
+    return existing;
+  }
 
   if (token.assignedTo && token.assignedTo !== doctorUsername) {
     throw bad('This patient is assigned to another room.', 403);

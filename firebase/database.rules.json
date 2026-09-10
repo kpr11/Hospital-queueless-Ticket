@@ -1,5 +1,10 @@
 {
   "rules": {
+    ".read": false,
+    ".write": false,
+    "analytics": {
+      "events": { ".indexOn": ["event_type", "timestamp"] }
+    },
 
     "queue": {
       "state": {
@@ -18,7 +23,7 @@
       },
 
       "tokens": {
-        ".read": true,
+        ".read": false,
         ".write": false,
         "$tokenId": {
           ".validate": "newData.hasChildren(['id', 'number', 'status', 'service', 'issuedAt', 'priority'])",
@@ -66,7 +71,7 @@
     "presence": {
       ".read": true,
       "$username": {
-        ".write": true,
+        ".write": false,
         ".validate": "newData.hasChildren(['online', 'lastSeen', 'service', 'username']) && newData.child('username').val() === $username"
       }
     },
@@ -114,4 +119,3 @@
     }
   }
 }
-

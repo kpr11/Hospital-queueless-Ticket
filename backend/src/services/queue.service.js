@@ -39,7 +39,7 @@ async function ensureInitialized() {
   }
   const cfgSnap = await refs.appConfig().once('value');
   if (!cfgSnap.exists()) {
-    await refs.appConfig().set({ industry: 'general', orgName: 'QueueLess' });
+    await refs.appConfig().set(config.initialConfig);
   }
 }
 
@@ -185,181 +185,75 @@ function sortByPriorityThenNumber(a, b) {
   return a.number - b.number;
 }
 
-async function callNextToken(service = 'general', staffUsername = null, { assignedTo = null } = {}) {
-  const stateSnap = await refs.queueState().once('value');
-  const state = stateSnap.val();
-  if (state.status === QUEUE_STATUS.PAUSED) {
-    const err = new Error('Cannot advance queue while paused. Resume first.');
-    err.statusCode = 423;
-    throw err;
-  }
-
-  const pausedServices = Array.isArray(state.pausedServices) ? state.pausedServices : [];
-  if (pausedServices.includes(service)) {
-    throw Object.assign(
-      new Error(`Service "${service}" is currently paused. Resume it before calling tokens.`),
-      { statusCode: 423 }
-    );
-  }
-
-  const tokensSnap = await refs.tokens().once('value');
-  const all = tokensSnap.val() || {};
-  const tokenList = Object.values(all);
-
-  const anyPriorityWaiting = tokenList.some(
-    t => t.status === TOKEN_STATUS.WAITING && isPriorityTier(t)
-  );
-
-  // When a caller owns a room (OPD doctor), they only clear their own "called"
-  // token and are served their own assigned patients first, then any unassigned.
-  const mineOnly = (t) => !assignedTo || t.assignedTo === assignedTo;
-  const previouslyCalled = tokenList.find(
-    t => t.status === TOKEN_STATUS.CALLED && t.service === service && mineOnly(t)
-  );
-  const waitingForService = tokenList
-    .filter(t => t.status === TOKEN_STATUS.WAITING && t.service === service)
-    .filter(t => !assignedTo || t.assignedTo === assignedTo || !t.assignedTo)
-    .sort((a, b) => {
-      if (assignedTo) {
-        const am = a.assignedTo === assignedTo ? 0 : 1;
-        const bm = b.assignedTo === assignedTo ? 0 : 1;
-        if (am !== bm) return am - bm;
-      }
-      return sortByPriorityThenNumber(a, b);
-    });
-
-  const next = waitingForService[0];
-
-  if (anyPriorityWaiting && next && !isPriorityTier(next)) {
-    const err = new Error('Priority customers are waiting. Please serve all priority tokens first before calling regular queue.');
-    err.statusCode = 409;
-    err.code = 'PRIORITY_BLOCKING';
-    throw err;
-  }
-
-  const updates = {};
-  let servedAt = null;
-
-  if (previouslyCalled) {
-    servedAt = Date.now();
-    updates[`tokens/${previouslyCalled.id}/status`] = TOKEN_STATUS.SERVED;
-    updates[`tokens/${previouslyCalled.id}/servedAt`] = servedAt;
-  }
-
-  if (!next) {
-    if (Object.keys(updates).length > 0) {
-      await db.ref('queue').update(updates);
-      analytics.logEvent({
-        event_type: 'token_served',
-        token_id: previouslyCalled.id,
-        token_number: previouslyCalled.number,
-        service: previouslyCalled.service,
-        timestamp: servedAt,
-        service_duration_seconds: Math.round((servedAt - previouslyCalled.calledAt) / 1000),
-        staff_username: staffUsername || null,
-      }).catch(err => console.error('[analytics]', err.message));
-      analytics.upsertTokenRecord({ ...previouslyCalled, status: TOKEN_STATUS.SERVED, servedAt }).catch(() => {});
+async function advanceQueue({ service = 'general', assignedTo = null, priorityOnly = false, staffUsername = null }) {
+  let result;
+  let failure;
+  const tx = await db.ref('queue').transaction(current => {
+    result = null;
+    failure = null;
+    // A cold SDK cache may initially be null; Firebase retries with server data.
+    if (!current) return current;
+    const state = current.state || {};
+    if (state.status === QUEUE_STATUS.PAUSED || (!priorityOnly && (state.pausedServices || []).includes(service))) {
+      failure = Object.assign(new Error('Cannot advance queue while paused. Resume first.'), { statusCode: 423 });
+      return undefined;
     }
-    return { called: null, message: `No tokens waiting for ${service}.` };
-  }
-
-  const calledAt = Date.now();
-  updates[`tokens/${next.id}/status`] = TOKEN_STATUS.CALLED;
-  updates[`tokens/${next.id}/calledAt`] = calledAt;
-  updates[`state/currentTokenNumber`] = next.number;
-  updates[`state/lastCalledAt`] = calledAt;
-
-  await db.ref('queue').update(updates);
-
-  if (previouslyCalled) {
+    const tokens = Object.values(current.tokens || {});
+    const waiting = tokens.filter(t => t.status === TOKEN_STATUS.WAITING)
+      .filter(t => priorityOnly ? isPriorityTier(t) : t.service === service)
+      .filter(t => !assignedTo || t.assignedTo === assignedTo || !t.assignedTo)
+      .sort((a, b) => {
+        if (assignedTo) {
+          const difference = Number(b.assignedTo === assignedTo) - Number(a.assignedTo === assignedTo);
+          if (difference) return difference;
+        }
+        return sortByPriorityThenNumber(a, b);
+      });
+    const next = waiting[0];
+    if (!priorityOnly && next && !isPriorityTier(next) && tokens.some(t => t.status === TOKEN_STATUS.WAITING && isPriorityTier(t))) {
+      failure = Object.assign(new Error('Priority customers are waiting. Please serve all priority tokens first before calling regular queue.'),
+        { statusCode: 409, code: 'PRIORITY_BLOCKING' });
+      return undefined;
+    }
+    const targetService = next?.service || service;
+    const previous = (!priorityOnly || next) && tokens.find(t => t.status === TOKEN_STATUS.CALLED &&
+      t.service === targetService && (!assignedTo || t.assignedTo === assignedTo));
+    const now = Date.now();
+    const updated = { ...current, tokens: { ...(current.tokens || {}) }, state: { ...state } };
+    const served = previous ? { ...previous, status: TOKEN_STATUS.SERVED, servedAt: now } : null;
+    const called = next ? { ...next, status: TOKEN_STATUS.CALLED, calledAt: now } : null;
+    if (served) updated.tokens[served.id] = served;
+    if (called) {
+      updated.tokens[called.id] = called;
+      updated.state.currentTokenNumber = called.number;
+      updated.state.lastCalledAt = now;
+    }
+    result = { called, served };
+    return updated;
+  }, undefined, false);
+  if (failure) throw failure;
+  if (!tx.committed || !result) throw Object.assign(new Error('Queue unavailable. Please retry.'), { statusCode: 503 });
+  // Side effects run only after a successful commit, never inside retry callbacks.
+  for (const [eventType, token] of [['token_served', result.served], ['token_called', result.called]]) {
+    if (!token) continue;
     analytics.logEvent({
-      event_type: 'token_served',
-      token_id: previouslyCalled.id,
-      token_number: previouslyCalled.number,
-      service: previouslyCalled.service,
-      timestamp: servedAt,
-      service_duration_seconds: Math.round((servedAt - previouslyCalled.calledAt) / 1000),
-      staff_username: staffUsername || null,
+      event_type: eventType, token_id: token.id, token_number: token.number, service: token.service,
+      timestamp: eventType === 'token_called' ? token.calledAt : token.servedAt,
+      wait_duration_seconds: eventType === 'token_called' ? Math.round((token.calledAt - token.issuedAt) / 1000) : null,
+      service_duration_seconds: eventType === 'token_served' ? Math.round((token.servedAt - token.calledAt) / 1000) : null,
+      staff_username: staffUsername,
     }).catch(err => console.error('[analytics]', err.message));
-    analytics.upsertTokenRecord({ ...previouslyCalled, status: TOKEN_STATUS.SERVED, servedAt }).catch(() => {});
+    analytics.upsertTokenRecord(token).catch(() => {});
   }
+  return result.called ? { called: result.called } : { called: null, message: priorityOnly ? 'No priority tokens waiting.' : `No tokens waiting for ${service}.` };
+}
 
-  analytics.logEvent({
-    event_type: 'token_called',
-    token_id: next.id,
-    token_number: next.number,
-    service: next.service,
-    timestamp: calledAt,
-    wait_duration_seconds: Math.round((calledAt - next.issuedAt) / 1000),
-    staff_username: staffUsername || null,
-  }).catch(err => console.error('[analytics]', err.message));
-  analytics.upsertTokenRecord({ ...next, status: TOKEN_STATUS.CALLED, calledAt }).catch(() => {});
-
-  return { called: { ...next, status: TOKEN_STATUS.CALLED, calledAt } };
+async function callNextToken(service = 'general', staffUsername = null, { assignedTo = null } = {}) {
+  return advanceQueue({ service, staffUsername, assignedTo });
 }
 
 async function callNextPriorityToken(staffUsername = null) {
-  const stateSnap = await refs.queueState().once('value');
-  const state = stateSnap.val();
-  if (state.status === QUEUE_STATUS.PAUSED) {
-    const err = new Error('Cannot advance queue while paused. Resume first.');
-    err.statusCode = 423;
-    throw err;
-  }
-
-  const tokensSnap = await refs.tokens().once('value');
-  const all = tokensSnap.val() || {};
-  const tokenList = Object.values(all);
-
-  const next = tokenList
-    .filter(t => t.status === TOKEN_STATUS.WAITING && isPriorityTier(t))
-    .sort((a, b) => a.number - b.number)[0];
-
-  if (!next) return { called: null, message: 'No priority tokens waiting.' };
-
-  const previouslyCalled = tokenList.find(t => t.status === TOKEN_STATUS.CALLED && t.service === next.service);
-  const updates = {};
-  let servedAt = null;
-
-  if (previouslyCalled) {
-    servedAt = Date.now();
-    updates[`tokens/${previouslyCalled.id}/status`] = TOKEN_STATUS.SERVED;
-    updates[`tokens/${previouslyCalled.id}/servedAt`] = servedAt;
-  }
-
-  const calledAt = Date.now();
-  updates[`tokens/${next.id}/status`] = TOKEN_STATUS.CALLED;
-  updates[`tokens/${next.id}/calledAt`] = calledAt;
-  updates[`state/currentTokenNumber`] = next.number;
-  updates[`state/lastCalledAt`] = calledAt;
-
-  await db.ref('queue').update(updates);
-
-  if (previouslyCalled) {
-    analytics.logEvent({
-      event_type: 'token_served',
-      token_id: previouslyCalled.id,
-      token_number: previouslyCalled.number,
-      service: previouslyCalled.service,
-      timestamp: servedAt,
-      service_duration_seconds: Math.round((servedAt - previouslyCalled.calledAt) / 1000),
-      staff_username: staffUsername || null,
-    }).catch(err => console.error('[analytics]', err.message));
-    analytics.upsertTokenRecord({ ...previouslyCalled, status: TOKEN_STATUS.SERVED, servedAt }).catch(() => {});
-  }
-
-  analytics.logEvent({
-    event_type: 'token_called',
-    token_id: next.id,
-    token_number: next.number,
-    service: next.service,
-    timestamp: calledAt,
-    wait_duration_seconds: Math.round((calledAt - next.issuedAt) / 1000),
-    staff_username: staffUsername || null,
-  }).catch(err => console.error('[analytics]', err.message));
-  analytics.upsertTokenRecord({ ...next, status: TOKEN_STATUS.CALLED, calledAt }).catch(() => {});
-
-  return { called: { ...next, status: TOKEN_STATUS.CALLED, calledAt } };
+  return advanceQueue({ priorityOnly: true, staffUsername });
 }
 
 async function skipToken(tokenId) {

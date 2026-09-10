@@ -4,11 +4,12 @@ const config = require('./env');
 
 if (!admin.getApps().length) {
   admin.initializeApp({
-    credential: admin.cert({
+    projectId: config.firebase.projectId,
+    credential: config.firebase.privateKey ? admin.cert({
       projectId: config.firebase.projectId,
       clientEmail: config.firebase.clientEmail,
       privateKey: config.firebase.privateKey,
-    }),
+    }) : admin.applicationDefault(),
     databaseURL: config.firebase.databaseURL,
   });
 }

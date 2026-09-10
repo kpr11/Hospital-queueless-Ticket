@@ -1,6 +1,8 @@
 {
   "projects": {
-    "default": "hospital-queueless-dev"
+    "default": "hospital-queueless-prod-kpr11",
+    "production": "hospital-queueless-prod-kpr11",
+    "development": "hospital-queueless-dev"
   },
   "targets": {},
   "etags": {}

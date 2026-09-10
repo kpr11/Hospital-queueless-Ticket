@@ -65,6 +65,10 @@ async function getAnalytics(req, res) {
 }
 
 async function exportAnalyticsCsv(req, res) {
+  if (config.analytics.sink === 'firebase') {
+    res.attachment('queue_events.csv').type('text/csv').send(await analyticsService.exportFirebaseCsv());
+    return;
+  }
   const filepath = path.resolve(__dirname, '..', '..', config.analytics.csvPath);
   res.download(filepath, 'queue_events.csv', err => {
     if (err && !res.headersSent) res.status(404).json({ error: 'CSV file not found yet.' });

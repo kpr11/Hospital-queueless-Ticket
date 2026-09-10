@@ -36,7 +36,7 @@ const TOKEN_STATUS_EXPIRED = 'expired';
 exports.expireStaleTokens = onSchedule(
   {
     schedule: 'every 5 minutes',
-    timeZone: 'Asia/Karachi',
+    timeZone: 'Asia/Kolkata',
     memory: '256MiB',
     timeoutSeconds: 60,
   },

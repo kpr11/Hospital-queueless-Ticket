@@ -2,7 +2,8 @@ const fs = require('fs');
 const fsp = require('fs/promises');
 const path = require('path');
 const config = require('../config/env');
-const { refs } = require('../config/firebase');
+const { refs, db } = require('../config/firebase');
+const crypto = require('crypto');
 
 let mongoClient = null;
 let mongoCollection = null;
@@ -149,12 +150,18 @@ async function logEvent(event) {
   };
 
   const writes = [];
+  if (config.analytics.sink === 'firebase') {
+    writes.push(db.ref(`analytics/events/${crypto.randomUUID()}`).set(enriched));
+  }
   if (config.analytics.mongo.uri) {
     writes.push(appendMongo(enriched));
   }
-  writes.push(appendCsv(enriched));
+  if (config.analytics.sink !== 'firebase') writes.push(appendCsv(enriched));
 
-  await Promise.allSettled(writes);
+  const results = await Promise.allSettled(writes);
+  for (const result of results) {
+    if (result.status === 'rejected') console.error('[analytics] Event persistence failed:', result.reason.message);
+  }
 }
 
 const CSV_CACHE = {
@@ -169,13 +176,20 @@ async function getTrafficStats() {
   }
 
   try {
-    let events = [];
 
     // Collect wait-time stats from event log (only source for wait durations)
     let sumWait = 0;
     let waitCount = 0;
 
-    if (config.analytics.sink === 'mongo') {
+    if (config.analytics.sink === 'firebase') {
+      const snapshot = await db.ref('analytics/events').orderByChild('event_type').equalTo('token_called').once('value');
+      for (const ev of Object.values(snapshot.val() || {})) {
+        if (Number.isFinite(ev.wait_duration_seconds)) {
+          sumWait += ev.wait_duration_seconds;
+          waitCount++;
+        }
+      }
+    } else if (config.analytics.sink === 'mongo') {
       const col = await getMongoCollection();
       const callEvents = await col.find({ event_type: 'token_called' }).toArray();
       for (const ev of callEvents) {
@@ -286,6 +300,20 @@ async function getTrafficStats() {
 
 async function getStaffMetrics() {
   try {
+    if (config.analytics.sink === 'firebase') {
+      const snapshot = await db.ref('analytics/events').once('value');
+      const metrics = new Map();
+      for (const event of Object.values(snapshot.val() || {})) {
+        if (!event.staff_username || !['token_called', 'token_served'].includes(event.event_type)) continue;
+        const row = metrics.get(event.staff_username) || { username: event.staff_username, tokensServed: 0, tokensCalled: 0, totalSeconds: 0 };
+        if (event.event_type === 'token_called') row.tokensCalled++;
+        else { row.tokensServed++; row.totalSeconds += event.service_duration_seconds || 0; }
+        metrics.set(row.username, row);
+      }
+      return [...metrics.values()].map(({ totalSeconds, ...row }) => ({
+        ...row, avgServiceSeconds: row.tokensServed ? Math.round(totalSeconds / row.tokensServed) : 0,
+      })).sort((a, b) => b.tokensServed - a.tokensServed);
+    }
     if (!config.analytics.mongo.uri) return [];
     const col = await getMongoCollection();
 
@@ -345,4 +373,14 @@ async function close() {
   mongoTokensCollection = null;
 }
 
-module.exports = { logEvent, close, CSV_COLUMNS, getTrafficStats, getStaffMetrics, upsertTokenRecord };
+async function exportFirebaseCsv() {
+  const snapshot = await db.ref('analytics/events').once('value');
+  const events = Object.values(snapshot.val() || {}).sort((a, b) => a.timestamp - b.timestamp);
+  return CSV_COLUMNS.join(',') + '\n' + events.map(event => CSV_COLUMNS.map(key => {
+    const value = event[key];
+    // Spreadsheet exports must not interpret user-controlled text as formulas.
+    return csvEscape(typeof value === 'string' && /^[=+@\-\t\r]/.test(value) ? "'" + value : value);
+  }).join(',')).join('\n') + '\n';
+}
+
+module.exports = { exportFirebaseCsv, logEvent, close, CSV_COLUMNS, getTrafficStats, getStaffMetrics, upsertTokenRecord };

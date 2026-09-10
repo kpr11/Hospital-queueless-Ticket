@@ -32,8 +32,12 @@ export default function AdminStaff() {
 
     // Live presence subscription via Firebase client SDK
     const presenceRef = ref(db, 'presence');
-    const unsub = onValue(presenceRef, snap => setPresence(snap.val() || {}));
-    return () => unsub();
+    let latest = {};
+    const refresh = () => setPresence(Object.fromEntries(Object.entries(latest).map(([key, value]) =>
+      [key, { ...value, online: value.online && Date.now() - value.lastSeen < 90000 }])));
+    const unsub = onValue(presenceRef, snap => { latest = snap.val() || {}; refresh(); });
+    const timer = setInterval(refresh, 15000);
+    return () => { unsub(); clearInterval(timer); };
   }, [user]);
 
   // Keep form default service in sync when the org's industry profile loads/changes

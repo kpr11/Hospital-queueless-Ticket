@@ -11,6 +11,15 @@ function resolveDepartment(req, requested) {
   return req.user.service || '';
 }
 
+
+async function checkPatientAccess(req) {
+  const patient = await patientService.getPatient(req.params.id);
+  if (!isAdminTier(req.user.role) && patient.department !== req.user.service) {
+    throw Object.assign(new Error('Patient belongs to another department.'), { statusCode: 403 });
+  }
+  return patient;
+}
+
 // PUBLIC — self-service registration (reached via the home-page QR).
 async function register(req, res) {
   const patient = await patientService.registerPatient({
@@ -65,12 +74,17 @@ async function status(req, res) {
 
 // requireStaff — edit demographics on a pending registration.
 async function update(req, res) {
+  await checkPatientAccess(req);
+  if (!isAdminTier(req.user.role) && req.body.department && req.body.department !== req.user.service) {
+    return res.status(403).json({ error: "Cannot move a patient to another department." });
+  }
   const patient = await patientService.updatePatient(req.params.id, req.body);
   res.json({ message: 'Registration updated.', patient });
 }
 
 // requireStaff — cancel a pending registration.
 async function cancel(req, res) {
+  await checkPatientAccess(req);
   const patient = await patientService.cancelRegistration(req.params.id, req.user.sub);
   res.json({ message: 'Registration cancelled.', patient });
 }
@@ -96,7 +110,7 @@ async function verifyAndIssue(req, res) {
 
 // requireStaff — single patient lookup (e.g. after scanning the confirmation QR).
 async function getOne(req, res) {
-  const patient = await patientService.getPatient(req.params.id);
+  const patient = await checkPatientAccess(req);
   res.json({ patient });
 }
 

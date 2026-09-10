@@ -16,6 +16,11 @@ function buildApp() {
   app.disable('x-powered-by');
 
   app.use(helmet());
+  // Never let Hosting/CDN or browser caches retain patient/API responses.
+  app.use('/api', (_req, res, next) => {
+    res.set('Cache-Control', 'private, no-store');
+    next();
+  });
   app.use(cors({
     origin: config.corsOrigin.split(',').map(s => s.trim()),
     credentials: false,
@@ -28,8 +33,8 @@ function buildApp() {
   app.use(express.json({ limit: '10kb' }));
   app.use(express.urlencoded({ extended: false, limit: '10kb' }));
 
-  if (!config.isProduction) app.use(morgan('dev'));
-  else app.use(morgan('combined'));
+  if (config.nodeEnv === 'development') app.use(morgan('dev'));
+  else if (config.isProduction) app.use(morgan(':method :status :response-time ms'));
 
   // Brute-force protection for the login endpoint.
   const loginLimiter = rateLimit({
@@ -42,6 +47,7 @@ function buildApp() {
   app.use('/api/v1/auth/login', loginLimiter);
 
   const takeTokenLimiter = rateLimit({
+    skip: req => req.method !== 'POST',
     windowMs: 60 * 1000,
     max: 10,
     standardHeaders: true,

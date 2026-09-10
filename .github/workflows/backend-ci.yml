@@ -1,4 +1,4 @@
-name: Backend CI / Deploy
+name: Backend CI
 
 on:
   push:
@@ -24,7 +24,7 @@ jobs:
 
     strategy:
       matrix:
-        node: [20, 22]
+        node: [22]
 
     defaults:
       run:
@@ -62,44 +62,3 @@ jobs:
           FIREBASE_DATABASE_URL: https://ci.firebaseio.com
           ANALYTICS_SINK: csv
           ANALYTICS_CSV_PATH: /tmp/ci_events.csv
-
-  deploy:
-    name: Deploy to Render
-    needs: test
-
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Trigger Render Deploy Hook
-        env:
-          RENDER_DEPLOY_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK }}
-        run: |
-          if [ -z "$RENDER_DEPLOY_HOOK" ]; then
-            echo "::notice::RENDER_DEPLOY_HOOK secret not set — skipping deploy."
-            echo "Add it under Settings → Secrets → Actions once the Render service exists."
-            exit 0
-          fi
-          curl -fsS -X POST "$RENDER_DEPLOY_HOOK"
-          echo "Render deployment triggered."
-
-  smoke:
-    name: Post-deploy smoke (read-only)
-    needs: deploy
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Run smoke test
-        env:
-          BASE_URL: ${{ secrets.SMOKE_BASE_URL }}
-          ADMIN_USER: ${{ secrets.SMOKE_ADMIN_USER }}
-          ADMIN_PASS: ${{ secrets.SMOKE_ADMIN_PASS }}
-        run: |
-          if [ -z "$BASE_URL" ]; then
-            echo "::notice::SMOKE_BASE_URL not set — skipping smoke test."
-            exit 0
-          fi
-          sleep 60   # give Render a moment to roll the new build
-          SMOKE_READONLY=1 node scripts/smoke.js

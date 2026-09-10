@@ -1,3 +1,5 @@
+> Current deployment target: **Google Cloud Run + Firebase Hosting**. See the [GCP production runbook](docs/GCP-Production.md) for release commands, cloud debugging, verification and rollback. The older Render/Vercel instructions below are historical.
+
 # Deploying to production
 
 Hospital OPD build. Read **Blockers** before exposing anything publicly.

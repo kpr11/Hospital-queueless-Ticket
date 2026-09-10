@@ -1,3 +1,5 @@
+> Current deployment target: **Google Cloud Run + Firebase Hosting**. See the [GCP production runbook](GCP-Production.md) for release commands, cloud debugging, verification and rollback. The older Render/Vercel instructions below are historical.
+
 # Deployment
 
 Each module deploys independently. A frontend push never deploys backend

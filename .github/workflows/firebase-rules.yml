@@ -1,10 +1,6 @@
 name: Deploy Firebase Rules
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - 'firebase/database.rules.json'
   workflow_dispatch: {}
 
 jobs:
@@ -16,10 +12,10 @@ jobs:
       - name: Check for deploy secret
         id: gate
         env:
-          SA: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          SA: ${{ secrets.FIREBASE_PRODUCTION_SERVICE_ACCOUNT }}
         run: |
           if [ -z "$SA" ]; then
-            echo "::notice::FIREBASE_SERVICE_ACCOUNT not set — skipping rules deploy."
+            echo "::notice::FIREBASE_PRODUCTION_SERVICE_ACCOUNT not set — skipping rules deploy."
             echo "go=false" >> "$GITHUB_OUTPUT"
           else
             echo "go=true" >> "$GITHUB_OUTPUT"
@@ -28,7 +24,9 @@ jobs:
       - name: Deploy database rules
         if: steps.gate.outputs.go == 'true'
         working-directory: firebase
+        env:
+          SA: ${{ secrets.FIREBASE_PRODUCTION_SERVICE_ACCOUNT }}
         run: |
-          printf '%s' '${{ secrets.FIREBASE_SERVICE_ACCOUNT }}' > "$RUNNER_TEMP/sa.json"
+          printf '%s' "$SA" > "$RUNNER_TEMP/sa.json"
           export GOOGLE_APPLICATION_CREDENTIALS="$RUNNER_TEMP/sa.json"
-          npx --yes firebase-tools@latest deploy --only database --project hospital-queueless-dev --non-interactive
+          npx --yes firebase-tools@latest deploy --only database --project hospital-queueless-prod-kpr11 --non-interactive

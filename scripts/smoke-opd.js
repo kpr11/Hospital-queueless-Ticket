@@ -195,6 +195,13 @@ const uniqMobile = () => '9' + String(Math.floor(Math.random() * 1e9)).padStart(
   });
 
   // ---- cleanup ----
+  // Optional manifest lets a release harness remove precisely its synthetic
+  // records through an authorized Admin SDK, without resetting other data.
+  if (process.env.SMOKE_MANIFEST) {
+    require('fs').writeFileSync(process.env.SMOKE_MANIFEST, JSON.stringify({
+      ...created, tokens: [...created.tokens], consultationId: consultId || null,
+    }), { mode: 0o600 });
+  }
   const cleanup = [];
   for (const id of created.tokens) {
     const r = await req('POST', `/admin/queue/skip/${id}`, { token: admin });

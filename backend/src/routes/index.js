@@ -6,6 +6,7 @@ const { refs } = require('../config/firebase');
 const { reportError } = require('../utils/reportError');
 
 router.use('/auth',     require('./auth.routes'));
+router.use(require('./live.routes'));
 router.use('/tokens',   require('./token.routes'));
 router.use('/patients', require('./patient.routes'));
 router.use('/roster',   require('./roster.routes'));

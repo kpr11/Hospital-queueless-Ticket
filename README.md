@@ -440,6 +440,9 @@ python run_pipeline.py
 
 ## ☁️ Deployment
 
+**Current target: GCP Cloud Run + Firebase Hosting.** See the [production runbook](docs/GCP-Production.md). The production frontend uses `/api/v1` on the Firebase Hosting origin.
+
+
 ### Firebase Rules
 
 ```bash

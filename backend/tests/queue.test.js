@@ -6,8 +6,7 @@
  * Firebase here - we are testing that our HTTP layer wires up correctly and
  * that the queue service's pure logic behaves under known inputs.
  *
- * For full integration tests against real Firebase, see /tests/integration/
- * (added in v2 once a test project is provisioned).
+ * Firebase is mocked here; emulator tests must separately validate deployed rules.
  */
 
 // Set required env vars BEFORE importing anything that reads them.
@@ -58,7 +57,12 @@ jest.mock('../src/config/firebase', () => {
         val: () => get(path) ?? null,
       }),
       set: async (val) => set(path, val),
-      update: async (patch) => set(path, { ...(get(path) || {}), ...patch }),
+      update: async (patch) => {
+        for (const [key, value] of Object.entries(patch)) {
+          const target = path ? `${path}/${key}` : key;
+          if (value === null) remove(target); else set(target, value);
+        }
+      },
       remove: async () => remove(path),
       transaction: async (fn) => {
         const next = fn(get(path));
@@ -83,6 +87,7 @@ jest.mock('../src/config/firebase', () => {
       presence: () => makeRef('presence'),
       presenceMember: (u) => makeRef(`presence/${u}`),
       appConfig: () => makeRef('config'),
+      announcement: () => makeRef('queue/announcement'),
       queues: () => makeRef('queues'),
       queueDef: (id) => makeRef(`queues/${id}`),
       conversations: () => makeRef('conversations'),
@@ -289,7 +294,7 @@ describe('Token referral', () => {
     const status = await request(app).get(`/api/v1/tokens/${t.id}`);
     expect(status.body.service).toBe('eye');
     expect(status.body.status).toBe('waiting');
-    expect(status.body.patientName).toBe('John Roe');
+    expect(status.body.patientName).toBeUndefined();
   });
 
   test('rejects referral to the same counter', async () => {
@@ -1159,4 +1164,94 @@ describe('OPD roster, room assignment & consultations', () => {
       .set('Authorization', `Bearer ${drB}`).send({ from: 'docB' });
     expect(forbidden.status).toBe(403);
   });
+});
+
+describe('Production access and concurrency regressions', () => {
+  const { refs } = require('../src/config/firebase');
+  let owner;
+  beforeAll(async () => {
+    owner = (await request(app).post('/api/v1/auth/login').send({ username: 'admin', password: 'testpassword123' })).body.token;
+  });
+
+  test('public snapshots and token status omit patient data while owner retains it', async () => {
+    const token = await queueService.issueToken({ service: 'privacy', patientName: 'Private Patient', patientId: 'private-registration', note: 'clinical note' });
+    await refs.token(token.id).update({ referralReason: 'clinical reason', referralHistory: [{ reason: 'private' }], futurePrivateField: 'secret' });
+    const feed = await request(app).get('/api/v1/queue/public');
+    const status = await request(app).get(`/api/v1/tokens/${token.id}`);
+    expect(feed.status).toBe(200);
+    expect(status.status).toBe(200);
+    expect(feed.headers['cache-control']).toContain('no-store');
+    for (const publicRecord of [feed.body.tokens[token.id], status.body]) {
+      expect(publicRecord.number).toBe(token.number);
+      for (const field of ['patientName', 'patientId', 'note', 'referralReason', 'referralHistory', 'futurePrivateField']) {
+        expect(publicRecord).not.toHaveProperty(field);
+      }
+    }
+    const privateFeed = await request(app).get('/api/v1/queue/live').set('Authorization', `Bearer ${owner}`);
+    expect(privateFeed.body.tokens[token.id].patientName).toBe('Private Patient');
+    expect((await request(app).get('/api/v1/queue/live')).status).toBe(401);
+  });
+
+  test('presence requires authentication and derives identity from the session', async () => {
+    expect((await request(app).post('/api/v1/presence').send({ online: true })).status).toBe(401);
+    expect((await request(app).post('/api/v1/presence').set('Authorization', `Bearer ${owner}`).send({ online: true, username: 'victim' })).status).toBe(204);
+    expect((await refs.presenceMember('victim').once('value')).exists()).toBe(false);
+    expect((await request(app).post('/api/v1/presence').set('Authorization', `Bearer ${owner}`).send({ online: true })).status).toBe(204);
+    expect((await refs.presenceMember('admin').once('value')).val().username).toBe('admin');
+  });
+
+  test('concurrent queue advances commit different tokens without duplicate calls', async () => {
+    await queueService.resetQueue();
+    await queueService.issueToken({ service: 'concurrency' });
+    await queueService.issueToken({ service: 'concurrency' });
+    const results = await Promise.all([queueService.callNextToken('concurrency'), queueService.callNextToken('concurrency')]);
+    expect(new Set(results.map(result => result.called.id)).size).toBe(2);
+    const tokens = Object.values((await refs.tokens().once('value')).val());
+    expect(tokens.filter(token => token.status === 'called')).toHaveLength(1);
+    expect(tokens.filter(token => token.status === 'served')).toHaveLength(1);
+  });
+
+  test('deleted accounts lose access immediately', async () => {
+    const staffService = require('../src/services/staff.service');
+    await staffService.createStaff({ username: 'revokedstaff', password: 'staff-password-123', service: 'general' });
+    const session = await staffService.loginStaff('revokedstaff', 'staff-password-123');
+    await staffService.deleteStaff('revokedstaff');
+    const response = await request(app).get('/api/v1/queue/live').set('Authorization', `Bearer ${session.token}`);
+    expect(response.status).toBe(401);
+  });
+
+  test('password reset revokes old sessions and permits freshly issued sessions', async () => {
+    const bcrypt = require('bcryptjs');
+    await refs.admin('resetcheck').set({ username: 'resetcheck', role: 'admin', passwordHash: await bcrypt.hash('before-reset-123', 4) });
+    const oldSession = await authService.login('resetcheck', 'before-reset-123');
+    await authService.resetPassword('resetcheck', 'after-reset-123');
+    expect((await request(app).get('/api/v1/queue/live').set('Authorization', `Bearer ${oldSession.token}`)).status).toBe(401);
+    const freshSession = await authService.login('resetcheck', 'after-reset-123');
+    expect((await request(app).get('/api/v1/queue/live').set('Authorization', `Bearer ${freshSession.token}`)).status).toBe(200);
+  });
+});
+
+test('unassigned staff cannot read a patient clinical history', async () => {
+  const staffService = require('../src/services/staff.service');
+  await staffService.createStaff({ username: 'unassignedstaff', password: 'staff-password-123', service: 'opd' });
+  const session = await staffService.loginStaff('unassignedstaff', 'staff-password-123');
+  const response = await request(app).get('/api/v1/consultations?patientId=private-registration')
+    .set('Authorization', `Bearer ${session.token}`);
+  expect(response.status).toBe(403);
+});
+
+test('Firebase analytics persists events, exports CSV and computes staff metrics', async () => {
+  const config = require('../src/config/env');
+  const analytics = require('../src/services/analytics.service');
+  const { db } = require('../src/config/firebase');
+  const previousSink = config.analytics.sink;
+  config.analytics.sink = 'firebase';
+  try {
+    await analytics.logEvent({ event_type: 'token_served', staff_username: '=unsafeformula', service_duration_seconds: 42 });
+    const events = Object.values((await db.ref('analytics/events').once('value')).val());
+    expect(events).toHaveLength(1);
+    expect(events[0].service_duration_seconds).toBe(42);
+    expect(await analytics.exportFirebaseCsv()).toContain("'=unsafeformula");
+    expect(await analytics.getStaffMetrics()).toEqual([{ username: '=unsafeformula', tokensServed: 1, tokensCalled: 0, avgServiceSeconds: 42 }]);
+  } finally { config.analytics.sink = previousSink; }
 });

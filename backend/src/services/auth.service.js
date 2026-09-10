@@ -16,6 +16,7 @@ async function bootstrapAdmin() {
     // Break-glass password recovery (ADMIN_RESET_ON_BOOT=true).
     if (resetOnBoot) {
       patch.passwordHash = await bcrypt.hash(password, BCRYPT_ROUNDS);
+      patch.passwordResetAt = Date.now();
       console.warn(`[auth] ADMIN_RESET_ON_BOOT is set — password for "${username}" reset to ADMIN_PASSWORD. Turn this off and redeploy.`);
     }
     if (Object.keys(patch).length > 0) {
@@ -53,7 +54,7 @@ async function login(username, password) {
   }
 
   const token = jwt.sign(
-    { sub: username, role: account.role || 'admin', displayName: account.displayName || username },
+    { sub: username, sessionVersion: account.passwordResetAt || 0, role: account.role || 'admin', displayName: account.displayName || username },
     config.jwt.secret,
     { expiresIn: config.jwt.expiresIn }
   );
@@ -76,7 +77,7 @@ async function changePassword(username, currentPassword, newPassword) {
   if (newPassword.length < 8) throw Object.assign(new Error('New password must be at least 8 characters.'), { statusCode: 400 });
 
   const passwordHash = await bcrypt.hash(newPassword, BCRYPT_ROUNDS);
-  await refs.admin(username).update({ passwordHash });
+  await refs.admin(username).update({ passwordHash, passwordResetAt: Date.now() });
 }
 
 /**

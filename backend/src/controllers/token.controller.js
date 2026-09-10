@@ -1,4 +1,5 @@
 const queueService = require('../services/queue.service');
+const { publicToken } = require('../utils/publicToken');
 
 async function takeToken(req, res) {
   const { service, email, priority, groupSize, patientName, note } = req.body || {};
@@ -16,13 +17,13 @@ async function takeToken(req, res) {
 async function getTokenStatus(req, res) {
   const { id } = req.params;
   const status = await queueService.getTokenStatus(id);
-  res.json(status);
+  res.json(publicToken(status));
 }
 
 async function requeueToken(req, res) {
   const { id } = req.params;
   const newToken = await queueService.requeueToken(id);
-  res.status(201).json({ message: 'Token re-queued successfully.', token: newToken });
+  res.status(201).json({ message: 'Token re-queued successfully.', token: publicToken(newToken) });
 }
 
 module.exports = { takeToken, getTokenStatus, requeueToken };
