@@ -49,7 +49,7 @@ jobs:
 
       - name: Upload artifact
         if: steps.gate.outputs.go == 'true'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: rtdb-backup-${{ github.run_id }}
           path: ${{ runner.temp }}/backups/*.json
